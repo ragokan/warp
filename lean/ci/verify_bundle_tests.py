@@ -24,6 +24,10 @@ class VerifyBundleTests(unittest.TestCase):
             (resources / "THIRD_PARTY_LICENSES.txt").write_text("licenses")
             (resources / "settings_schema.json").write_text("{}")
             (resources / "WarpOss.icns").write_bytes(b"icon")
+            (resources / "bin").mkdir()
+            wrapper = resources / "bin/warp-oss"
+            wrapper.write_text('#!/bin/bash\nexec "$script_dir/../../MacOS/warp-oss" "$@"\n')
+            wrapper.chmod(0o755)
             plugin = contents / "PlugIns/WarpDockTilePlugin.docktileplugin/Contents/MacOS"
             plugin.mkdir(parents=True)
             (plugin / "WarpDockTilePlugin").write_bytes(b"plugin")
@@ -34,10 +38,41 @@ class VerifyBundleTests(unittest.TestCase):
                 "CFBundleVersion": "0.1.0",
                 "CFBundleIconFile": "WarpOss.icns",
                 "NSDockTilePlugIn": "WarpDockTilePlugin.docktileplugin",
+                "CFBundleURLTypes": [{"CFBundleURLSchemes": ["warposs"]}],
+                "CFBundleDocumentTypes": [{"LSItemContentTypes": ["public.folder"]}],
+                "NSServices": [{"NSMessage": "openTab"}, {"NSMessage": "openWindow"}],
+                "SMAuthorizedClients": ["dev.warp.WarpOss"],
+                "LSBackgroundOnly": False,
+                "UIDesignRequiresCompatibility": True,
             }
+            for permission in (
+                "AppleEvents", "Camera", "Microphone", "Contacts", "Calendars",
+                "CalendarsFullAccess", "Reminders", "RemindersFullAccess", "Location",
+                "PhotoLibrary",
+            ):
+                plist[f"NS{permission}UsageDescription"] = "A program in Warp requests access."
             path = contents / "Info.plist"
             path.write_bytes(plistlib.dumps(plist))
             bundle.verify("macos", root)
+            for key in (
+                "CFBundleURLTypes", "CFBundleDocumentTypes", "NSServices", "SMAuthorizedClients",
+                "NSCameraUsageDescription", "UIDesignRequiresCompatibility", "LSBackgroundOnly",
+            ):
+                with self.subTest(missing=key):
+                    incomplete = dict(plist)
+                    del incomplete[key]
+                    path.write_bytes(plistlib.dumps(incomplete))
+                    with self.assertRaises(AssertionError):
+                        bundle.verify("macos", root)
+            wrong_scheme = dict(plist, CFBundleURLTypes=[{"CFBundleURLSchemes": ["warp"]}])
+            path.write_bytes(plistlib.dumps(wrong_scheme))
+            with self.assertRaises(AssertionError):
+                bundle.verify("macos", root)
+            path.write_bytes(plistlib.dumps(plist))
+            wrapper.chmod(0o644)
+            with self.assertRaises(AssertionError):
+                bundle.verify("macos", root)
+            wrapper.chmod(0o755)
             binary.write_bytes(struct.pack("<II", 0xFEEDFACF, 0x01000007))
             with self.assertRaisesRegex(AssertionError, "arm64"):
                 bundle.verify("macos", root)
@@ -56,7 +91,9 @@ class VerifyBundleTests(unittest.TestCase):
             struct.pack_into("<H", header, 18, 183)
             binary.write_bytes(header)
             binary.chmod(0o755)
-            (root / "dev.warp.WarpOss.desktop").write_text("Exec=warp-terminal-oss %U\nIcon=dev.warp.WarpOss\n")
+            desktop = root / "dev.warp.WarpOss.desktop"
+            entry = "Exec=warp-terminal-oss %U\nIcon=dev.warp.WarpOss\nMimeType=x-scheme-handler/warposs;\n"
+            desktop.write_text(entry)
             (root / "dev.warp.WarpOss.png").write_bytes(b"icon")
             resources = root / "resources"
             (resources / "bundled").mkdir(parents=True)
@@ -64,6 +101,11 @@ class VerifyBundleTests(unittest.TestCase):
             (resources / "settings_schema.json").write_text("{}")
             system = "libc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x1234)"
             bundle.verify("linux", root, system)
+            for invalid in (entry.replace("warposs", "warp"), entry.split("MimeType")[0]):
+                desktop.write_text(invalid)
+                with self.assertRaises(AssertionError):
+                    bundle.verify("linux", root, system)
+            desktop.write_text(entry)
             for dependencies in ["libfoo.so => not found", "libfoo.so => /opt/warp/libfoo.so (0x1234)", ""]:
                 with self.assertRaises(AssertionError):
                     bundle.verify("linux", root, dependencies)

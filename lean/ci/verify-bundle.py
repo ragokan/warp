@@ -18,8 +18,32 @@ def verify(platform, root, ldd=None):
         assert plist["CFBundleExecutable"] == "warp-oss", plist
         assert plist["CFBundlePackageType"] == "APPL", plist
         assert re.fullmatch(r"\d+\.\d+\.\d+", plist["CFBundleVersion"]), plist
+        assert any(
+            "warposs" in item.get("CFBundleURLSchemes", [])
+            for item in plist.get("CFBundleURLTypes", [])
+        ), "Missing warposs URL scheme"
+        assert any(
+            "public.folder" in item.get("LSItemContentTypes", [])
+            for item in plist.get("CFBundleDocumentTypes", [])
+        ), "Missing folder document type"
+        assert {"openTab", "openWindow"} <= {
+            item.get("NSMessage") for item in plist.get("NSServices", [])
+        }, "Missing terminal services"
+        assert "dev.warp.WarpOss" in plist.get("SMAuthorizedClients", []), "Missing authorized client"
+        assert plist.get("LSBackgroundOnly") is False, "Expected foreground app"
+        assert plist.get("UIDesignRequiresCompatibility") is True, "Missing compatibility setting"
+        for permission in (
+            "AppleEvents", "Camera", "Microphone", "Contacts", "Calendars",
+            "CalendarsFullAccess", "Reminders", "RemindersFullAccess", "Location",
+            "PhotoLibrary",
+        ):
+            key = f"NS{permission}UsageDescription"
+            assert isinstance(plist.get(key), str) and plist[key], f"Missing {key}"
         binary = contents / "MacOS" / plist["CFBundleExecutable"]
         resources = contents / "Resources"
+        wrapper = resources / "bin/warp-oss"
+        assert wrapper.is_file() and wrapper.stat().st_mode & 0o111, "Missing executable CLI wrapper"
+        assert "../../MacOS/warp-oss" in wrapper.read_text(), "Unexpected CLI wrapper target"
         assert (resources / plist["CFBundleIconFile"]).stat().st_size > 0
         plugin = contents / "PlugIns" / plist["NSDockTilePlugIn"]
         assert (plugin / "Contents/MacOS/WarpDockTilePlugin").stat().st_size > 0
@@ -37,6 +61,10 @@ def verify(platform, root, ldd=None):
         desktop = (root / "dev.warp.WarpOss.desktop").read_text()
         assert "Exec=warp-terminal-oss %U" in desktop
         assert "Icon=dev.warp.WarpOss" in desktop
+        mime_types = re.search(r"^MimeType=(.*)$", desktop, re.MULTILINE)
+        assert mime_types and "x-scheme-handler/warposs" in mime_types[1].split(";"), (
+            "Missing warposs MIME handler"
+        )
         assert (root / "dev.warp.WarpOss.png").stat().st_size > 0
         if ldd is not None:
             assert "not found" not in ldd, ldd

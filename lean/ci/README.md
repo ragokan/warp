@@ -4,40 +4,68 @@
 platforms upload artifacts for 14 days. Only `lean-v*` tags create a **draft**
 GitHub Release, after both builds pass. No release is created on branch pushes.
 
-The build currently uses the stock OSS binary with the release profile, bundled
-resources, no LTO, and no debug symbols. In the single **Build production OSS
-binary** step, switch the `binary=...` line to:
+The **Build production lean binary** step runs `lean/build.sh`, which builds
+`warp-oss` with `--no-default-features`, an explicit terminal feature list, and
+the `lean` Cargo profile exactly as defined in `Cargo.toml`: ThinLTO, its default
+codegen units, no debug symbols, and stripped symbols. CI has no profile
+overrides; branch tests and tagged releases use the same production build.
+Packaging accepts the binary path printed by the build script. It does not
+invoke the private channel config installer or use Warp secrets.
+
+Workflows introduced by a future upstream sync can arrive enabled. After each
+sync, list all workflows and disable newly introduced upstream workflows,
+leaving **Lean release** active:
 
 ```bash
-binary="$(bash lean/build.sh)"
+gh workflow list --all --repo ragokan/warp
+gh workflow disable <new-workflow-id> --repo ragokan/warp
 ```
-
-The build script must write only its binary path to stdout and diagnostics to
-stderr. Packaging accepts that path, including a custom Cargo profile directory.
-It does not invoke the private channel config installer or use Warp secrets.
 
 ## macOS
 
 Extract `lean-warp-macos-arm64.zip`, or mount the DMG, and move `WarpOss.app` to
-Applications. The app is ad-hoc signed, **not notarized**. On first launch,
-right-click the app and select **Open**. If macOS still blocks it, and you trust
-the downloaded build, remove its quarantine attribute:
+Applications. The app is ad-hoc signed, **not notarized**. On macOS 15+, try
+opening it once, then use **System Settings → Privacy & Security → Open Anyway**
+if you trust the downloaded build. See [Apple's Gatekeeper instructions](https://support.apple.com/en-us/102445).
+Alternatively, remove its quarantine attribute:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/WarpOss.app
 ```
 
-CI checks the bundle plist, arm64 Mach-O header, resources, settings schema,
-licenses, and signature. `codesign -dv --verbose=4` is captured in its logs.
+CI checks the bundle plist, URL scheme, document types, usage descriptions,
+terminal services, authorized client, CLI wrapper, arm64 Mach-O header,
+resources, settings schema, licenses, and signature. The wrapper generates the
+settings schema during packaging. `codesign -dv --verbose=4` is captured in logs.
 Packaging checks do not establish successful GUI startup on a real Mac.
 
 ## Linux
 
-Extract `lean-warp-linux-arm64.tar.gz` and run `./warp-terminal-oss` from the
-extracted directory. Keep `resources/` next to the executable. The included
-desktop file expects `warp-terminal-oss` on PATH; install the PNG under the icon
-name `dev.warp.WarpOss` and the desktop file under your applications directory
-if you want launcher integration.
+Extract `lean-warp-linux-arm64.tar.gz`. For a portable run, keep the entire
+extracted directory together and run `./warp-terminal-oss` there.
+
+For installation, use the checkout's existing [`lean/install-linux.sh`](../install-linux.sh)
+with the extracted binary, then copy the packaged resources alongside the real
+installed binary. From the repository root, with default XDG paths:
+
+```bash
+package=/absolute/path/to/lean-warp-linux-arm64
+bash lean/install-linux.sh "$package/warp-terminal-oss"
+cp -R "$package/resources/." "$HOME/.local/lib/warp-lean/resources/"
+update-desktop-database "$HOME/.local/share/applications"
+xdg-mime default dev.warp.WarpOss.desktop x-scheme-handler/warposs
+```
+
+The installer places the real binary at `~/.local/lib/warp-lean/warp-oss` and
+creates a `~/.local/bin/warp-lean` **symlink**. Keep `resources/` next to that real
+binary; do not copy only the binary onto PATH. Ensure `~/.local/bin` is on PATH
+for shell use. The installer writes a desktop entry with an **absolute Exec
+path**, so desktop launch and login callbacks work independently of the GUI
+session's PATH. The portable archive's reference desktop entry keeps the bare
+`warp-terminal-oss` name for relocatable installations; use the installer's
+generated desktop entry for this installation. The database refresh and
+`warposs` MIME registration above enable the login callback. If you customize
+`LEAN_INSTALL_PREFIX` or XDG directories, use the matching paths.
 
 The build targets Ubuntu 24.04 arm64 and requires its standard system libraries;
 older distributions may not satisfy the glibc requirement. CI checks the ELF
@@ -49,7 +77,9 @@ upstream's packaging also configures Warp's apt repository and update scripts.
 ## Local packaging checks
 
 ```bash
-bash -n lean/ci/bundle-macos.sh lean/ci/bundle-linux.sh
+for script in lean/ci/bundle-macos.sh lean/ci/bundle-linux.sh; do
+  bash -n "$script"
+done
 python3 -m unittest discover -s lean/ci -p '*_tests.py'
 python3 lean/ci/verify-bundle.py macos /path/to/WarpOss.app
 python3 lean/ci/verify-bundle.py linux /path/to/lean-warp-linux-arm64
