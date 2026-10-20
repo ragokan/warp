@@ -1,0 +1,125 @@
+name: Lean release
+
+on:
+  push:
+    branches: [lean-ci]
+    tags: ['lean-v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lean-release-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }} arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            runner: macos-15
+          - platform: linux
+            runner: ubuntu-24.04-arm
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_RELEASE_DEBUG: 0
+      CARGO_PROFILE_RELEASE_LTO: 'false'
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
+      GIT_RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Check packaging logic
+        run: |
+          bash -n lean/ci/bundle-macos.sh lean/ci/bundle-linux.sh
+          python3 -m unittest discover -s lean/ci -p '*_tests.py'
+
+      - name: Install macOS build dependencies
+        if: runner.os == 'macOS'
+        run: |
+          test "$(uname -m)" = arm64
+          xcodebuild -version
+          if ! xcrun --sdk macosx metal --version; then
+            xcodebuild -downloadComponent MetalToolchain
+          fi
+          HOMEBREW_NO_AUTO_UPDATE=1 brew install protobuf
+          protoc --version
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          test "$(uname -m)" = aarch64
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config libssl-dev \
+            libfreetype-dev libexpat1-dev libgit2-dev libfontconfig1-dev \
+            libclang-dev protobuf-compiler libegl1 libwayland-client0 libwayland-egl1 \
+            libx11-6 libxcb1 libxcursor1 libxi6 libxkbcommon-x11-0
+          protoc --version
+
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain
+
+      - uses: Swatinem/rust-cache@e9d7b9f1e587218970671bac74e5511ed9506e6a # v2
+        with:
+          key: lean-release-${{ matrix.platform }}-arm64
+          cache-on-failure: true
+
+      - name: Install license attribution tool
+        run: script/install_cargo_release_deps --no-build-deps
+
+      # BUILD INTERFACE: replace only the binary assignment with binary="$(bash lean/build.sh)".
+      - name: Build production OSS binary
+        id: build
+        run: |
+          binary="$(cargo build --locked --release -p warp --bin warp-oss --features release_bundle >&2 && echo target/release/warp-oss)"
+          test -x "$binary"
+          echo "binary=$binary" >> "$GITHUB_OUTPUT"
+
+      - name: Bundle and inspect
+        env:
+          BINARY: ${{ steps.build.outputs.binary }}
+          PLATFORM: ${{ matrix.platform }}
+        run: bash "lean/ci/bundle-$PLATFORM.sh" "$BINARY" dist
+
+      - name: Upload packages
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: lean-warp-${{ matrix.platform }}-arm64
+          path: dist/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  draft-release:
+    name: Draft tagged release
+    if: startsWith(github.ref, 'refs/tags/lean-v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: lean-warp-*
+          path: dist
+          merge-multiple: true
+      - name: Create draft with packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/* --verify-tag --draft --title "$TAG" \
+            --notes 'Lean Warp arm64 builds. macOS is ad-hoc signed and not notarized. See lean/ci/README.md for installation and verification limits.'
