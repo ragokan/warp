@@ -54,14 +54,6 @@ with open(sys.argv[1], "wb") as stream:
 PY
 WARP_PLIST_PATH="$contents/Info.plist" WARP_SCHEME_NAME=warposs script/update_plist
 
-mkdir -p "$contents/Resources/bin"
-cat > "$contents/Resources/bin/warp-oss" <<'WRAPPER'
-#!/bin/bash
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec -a "$0" "$script_dir/../../MacOS/warp-oss" "$@"
-WRAPPER
-chmod 755 "$contents/Resources/bin/warp-oss"
-
 iconset="$stage/WarpOss.iconset"
 mkdir "$iconset"
 for size in 16 32 128 256 512; do
@@ -69,7 +61,7 @@ for size in 16 32 128 256 512; do
     --out "$iconset/icon_${size}x${size}.png" >/dev/null
 done
 iconutil -c icns "$iconset" -o "$contents/Resources/WarpOss.icns"
-SETTINGS_SCHEMA_EXECUTABLE="$contents/Resources/bin/warp-oss" \
+SETTINGS_SCHEMA_EXECUTABLE="$contents/MacOS/warp-oss" \
   script/prepare_bundled_resources "$contents/Resources" oss
 cp LICENSE-AGPL LICENSE-MIT "$contents/Resources/"
 

@@ -24,10 +24,6 @@ class VerifyBundleTests(unittest.TestCase):
             (resources / "THIRD_PARTY_LICENSES.txt").write_text("licenses")
             (resources / "settings_schema.json").write_text("{}")
             (resources / "WarpOss.icns").write_bytes(b"icon")
-            (resources / "bin").mkdir()
-            wrapper = resources / "bin/warp-oss"
-            wrapper.write_text('#!/bin/bash\nexec "$script_dir/../../MacOS/warp-oss" "$@"\n')
-            wrapper.chmod(0o755)
             plugin = contents / "PlugIns/WarpDockTilePlugin.docktileplugin/Contents/MacOS"
             plugin.mkdir(parents=True)
             (plugin / "WarpDockTilePlugin").write_bytes(b"plugin")
@@ -69,10 +65,14 @@ class VerifyBundleTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 bundle.verify("macos", root)
             path.write_bytes(plistlib.dumps(plist))
-            wrapper.chmod(0o644)
-            with self.assertRaises(AssertionError):
-                bundle.verify("macos", root)
+            (resources / "bin").mkdir()
+            wrapper = resources / "bin/warp-oss"
+            wrapper.write_text('#!/bin/bash\nexec "$script_dir/../../MacOS/warp-oss" "$@"\n')
             wrapper.chmod(0o755)
+            with self.assertRaisesRegex(AssertionError, "CLI"):
+                bundle.verify("macos", root)
+            wrapper.unlink()
+            wrapper.parent.rmdir()
             binary.write_bytes(struct.pack("<II", 0xFEEDFACF, 0x01000007))
             with self.assertRaisesRegex(AssertionError, "arm64"):
                 bundle.verify("macos", root)

@@ -41,9 +41,7 @@ def verify(platform, root, ldd=None):
             assert isinstance(plist.get(key), str) and plist[key], f"Missing {key}"
         binary = contents / "MacOS" / plist["CFBundleExecutable"]
         resources = contents / "Resources"
-        wrapper = resources / "bin/warp-oss"
-        assert wrapper.is_file() and wrapper.stat().st_mode & 0o111, "Missing executable CLI wrapper"
-        assert "../../MacOS/warp-oss" in wrapper.read_text(), "Unexpected CLI wrapper target"
+        assert not (resources / "bin").exists(), "CLI wrappers must not ship in the lean bundle"
         assert (resources / plist["CFBundleIconFile"]).stat().st_size > 0
         plugin = contents / "PlugIns" / plist["NSDockTilePlugIn"]
         assert (plugin / "Contents/MacOS/WarpDockTilePlugin").stat().st_size > 0

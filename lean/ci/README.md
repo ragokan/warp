@@ -34,9 +34,10 @@ xattr -dr com.apple.quarantine /Applications/WarpOss.app
 ```
 
 CI checks the bundle plist, URL scheme, document types, usage descriptions,
-terminal services, authorized client, CLI wrapper, arm64 Mach-O header,
-resources, settings schema, licenses, and signature. The wrapper generates the
-settings schema during packaging. `codesign -dv --verbose=4` is captured in logs.
+terminal services, authorized client, arm64 Mach-O header, resources, settings
+schema, licenses, and signature. The bundle omits `Resources/bin` and its Warp/Oz
+CLI entry point; CI asserts its absence. Packaging invokes the app executable
+directly to generate the settings schema. `codesign -dv --verbose=4` is captured in logs.
 Packaging checks do not establish successful GUI startup on a real Mac.
 
 ## Linux
