@@ -101,7 +101,8 @@ blocks, Find, copy and syntax highlighting remain. The â€œShow Warp network logâ
 
 ## Patches
 
-Every upstream change is gated by `lean`; default upstream behavior is retained.
+The terminal-focused removals are gated by `lean`. The behavior-preserving performance
+fixes listed below also apply to default builds.
 
 | Path | Change and reason |
 | --- | --- |
@@ -176,6 +177,17 @@ No plugin changes or support code are included.
 
 The optional present-mode, flat-storage and reference-fork optimizations are omitted unless
 later measurements justify them. No GPU timing or storage/selection behavior changes are made.
+
+## Ungated performance fixes
+
+- Terminal writes skip empty selection resets while still clearing pending AI context;
+  alt-screen motion skips duplicate cell reports, and the cell glyph cache uses hashbrown.
+- PTY reads wait for the terminal lock when the input buffer is full or drained, instead
+  of spinning. Buffered EOF data is parsed before reading stops.
+- macOS windows skip drawing after an occlusion notification and request a redraw
+  when visible again; new windows default to visible.
+- Alt-screen hover reports respect the mouse-reporting setting, SGR mode and shared-session
+  reader restrictions, as clicks and drags already do.
 
 ## Checks and benchmarks
 

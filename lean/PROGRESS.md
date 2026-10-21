@@ -1,5 +1,26 @@
 # Lean build progress
 
+## 2026-10-21 — terminal performance plan
+
+- Selection-reset, cell-motion dedupe, glyph-cache hashing, PTY lock waiting, macOS
+  occlusion and hover-reporting fixes apply to both builds. Hidden footer/sampler
+  work and the 30/s Linux wakeup cap remain lean-only. No dependencies were added.
+- Four new regressions failed real Cargo assertions before their fixes, then passed
+  with lean and default features. Pending AI context without a selection is covered.
+- Full view suite: final 163 passed/20 failed; baseline 161 passed/22 failed, including
+  the two expected new failures. The same 20 baseline failures remain unchanged.
+  Grid: 5 passed/1 ignored; alt-screen: 1; event-loop: 3; lean surface: 4; lean filters:
+  16; cloud preferences: 9; URI: 74; warpui_core lean: 2. Normal targeted Clippy passed.
+- PTY throughput gate passed on Linux: baseline median 2.362s, commit-2 median
+  2.265s (-4.1% elapsed); CPU medians 23.69s and 23.34s (-1.5%). Three matched
+  seq-3M runs per build. Other Warp build containers were paused/restored for each
+  after sample; no concurrent build was present during the baseline samples.
+- Scoped rustfmt preserves pre-existing formatting. The approved Linux builder has
+  no clang-format; Objective-C follows surrounding style and requires macOS CI.
+- Private logs and desktop/benchmark evidence stay under /tmp/warp-lean-evidence/perf/.
+  Native macOS occlusion behavior and macOS bulk-output throughput require user hardware.
+
+
 ## 2026-10-21 — product removal, poll-only sync and Warper
 
 - Four authorized areas: remaining AI/Drive/MCP/telemetry surfaces; selected optional

@@ -357,7 +357,11 @@ impl AltScreenElement {
         // For alt-screen PTY purposes, we ignore synthetic mouse events!
         // This is especially relevant for mouse drags - we do not want mouse moved
         // events being handled at the same time as mouse dragged events.
-        if !is_synthetic && self.model.lock().is_term_mode_set(TermMode::MOUSE_MOTION) {
+        let model = self.model.lock();
+        if !is_synthetic
+            && model.is_term_mode_set(TermMode::MOUSE_MOTION)
+            && !should_intercept_mouse(&model, false, app)
+        {
             // Note: it is counter-intuitive to use "pressed" as a state here for mouse hover motions, however,
             // we're largely just following standards from Alacritty/other terminals and the original terminal specs.
             // We intend to combine the mouse button and mouse action enums to avoid "weird" or "impossible" combinations,
@@ -1026,5 +1030,99 @@ impl ScrollableElement for AltScreenElement {
         ctx.dispatch_typed_action(TerminalAction::SharedSessionViewerAltScroll {
             new_scroll_top: self.scroll_top,
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use settings::Setting as _;
+    use warpui::{App, EntityIdSet, Presenter, SingletonEntity, WindowInvalidation};
+
+    use super::*;
+    use crate::terminal::alt_screen_reporting::AltScreenReporting;
+    use crate::terminal::model::ansi::{Handler as _, Mode};
+    use crate::terminal::view::Event as TerminalEvent;
+    use crate::test_util::terminal::{
+        add_window_with_id_and_terminal, initialize_app_for_terminal_view,
+    };
+
+    #[test]
+    fn hover_reports_respect_mouse_reporting_and_sgr() {
+        App::test((), |mut app| async move {
+            initialize_app_for_terminal_view(&mut app);
+            let (window_id, terminal) = add_window_with_id_and_terminal(&mut app, None);
+            let writes = Rc::new(RefCell::new(Vec::new()));
+            let observed = writes.clone();
+            app.update(|ctx| {
+                ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                    if let TerminalEvent::WriteBytesToPty { bytes } = event {
+                        observed.borrow_mut().push(bytes.to_vec());
+                    }
+                });
+            });
+            let size = terminal.update(&mut app, |view, _| {
+                let mut model = view.model.lock();
+                model.set_mode(Mode::SwapScreen {
+                    save_cursor_and_clear_screen: true,
+                });
+                model.set_mode(Mode::ReportAllMouseMotion);
+                *view.size_info()
+            });
+            let presenter = Rc::new(RefCell::new(Presenter::new(window_id)));
+            for (enabled, sgr, expected) in [(false, true, 0), (true, false, 0), (true, true, 1)] {
+                AltScreenReporting::handle(&app).update(&mut app, |settings, ctx| {
+                    settings
+                        .mouse_reporting_enabled
+                        .set_value(enabled, ctx)
+                        .unwrap();
+                });
+                terminal.update(&mut app, |view, _| {
+                    if sgr {
+                        view.model.lock().set_mode(Mode::SgrMouse);
+                    } else {
+                        view.model.lock().unset_mode(Mode::SgrMouse);
+                    }
+                });
+                writes.borrow_mut().clear();
+                let mut updated = EntityIdSet::default();
+                updated.insert(app.root_view_id(window_id).unwrap());
+                app.update(|ctx| {
+                    presenter.borrow_mut().invalidate(
+                        WindowInvalidation {
+                            updated,
+                            ..Default::default()
+                        },
+                        ctx,
+                    );
+                    presenter.borrow_mut().build_scene(
+                        vec2f(size.pane_width_px, size.pane_height_px),
+                        1.,
+                        None,
+                        ctx,
+                    );
+                    ctx.simulate_window_event(
+                        Event::MouseMoved {
+                            position: vec2f(
+                                3. * size.cell_width_px.as_f32(),
+                                3. * size.cell_height_px.as_f32(),
+                            ),
+                            cmd: false,
+                            shift: false,
+                            is_synthetic: false,
+                        },
+                        window_id,
+                        presenter.clone(),
+                    );
+                });
+                assert_eq!(
+                    writes.borrow().len(),
+                    expected,
+                    "enabled={enabled}, sgr={sgr}"
+                );
+            }
+        })
     }
 }
