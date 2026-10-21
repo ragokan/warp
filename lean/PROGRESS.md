@@ -1,5 +1,48 @@
 # Lean build progress
 
+## 2026-10-21 — Update Warper command
+
+- New `lean/warper-update` (POSIX shell, the only networked code and only while it runs): latest
+  `lean-vX.Y.Z` from the GitHub API, semver comparison, confirmation, archive + `SHA256SUMS`
+  download, checksum verification (missing or mismatching aborts), install (Linux: the whole new
+  install is staged, swapped in with renames and rolled back if a step fails; macOS: the old app
+  stays as `Warper.previous.app`), optional restart:
+  a detached relauncher waits up to 60 s for Warper's PID to exit (no signal is ever sent), then
+  starts the new version, and Warper quits through its normal Quit action once the script leaves a
+  marker file (Warper has no SIGTERM handler, so signalling it would skip the quit steps). It ships
+  in the Linux archive and in `Warper.app/Contents/Resources`;
+  `verify-bundle.py` requires it to be present and executable, and the release job attaches
+  `SHA256SUMS` to the draft. The script updates the install it sits in (not a guessed prefix). The
+  Linux archive ships `VERSION` (from the tag, checked by `verify-bundle.py`); `install-linux.sh`
+  copies it or removes a stale one, and an unknown version is reported and confirmed, not
+  treated as 0.0.0.
+- Lean-only "Check for Updates…" (existing `WorkspaceAction::CheckForUpdate`, a new
+  `CustomAction::CheckForUpdates` for the macOS menu, an avatar-menu item and a command-palette
+  binding) opens a new terminal tab running the script from next to the executable
+  (`Resources` inside the macOS bundle) with Warper's PID and a marker path; Warper polls the
+  marker once a second for 30 minutes. Warper itself makes no request.
+- Tested: twenty-five script tests against a local fake release (older, equal and newer, declined,
+  unknown or garbage version, portable copy refused, checksum mismatch and missing checksum abort
+  without touching the install, an incomplete archive and a failure after the binary swap leave the
+  old install intact, a failed restore or a failed backup placement keeps the staging folder (and
+  names it), a symlinked script updates its own install, a Linux install keeps the previous binary
+  and leaves no temporary files, the
+  relauncher waits for the PID without signalling it and then starts the new binary, gives up on a
+  PID that never exits, declining the restart, the relauncher's own session when `setsid` is
+  missing as on macOS (Warper kills the finished command's process group), macOS bundle
+  replacement keeping `Warper.previous.app` (also when placing it fails), mismatch, unwritable, `install-linux.sh` copying or
+  removing `VERSION`); four `verify-bundle` tests (script and `VERSION` required, version from the
+  release tag); four Rust tests for the command line, quoting and the marker; the lean surface
+  test asserts the command is registered. Run against the previous script and installer, 24 of
+  the 25 tests in `lean/ci` failed, covering each of these fixes.
+- Checked on the real Linux desktop (isolated XDG dirs, fake release through the env overrides):
+  the avatar-menu item opens the "Update Warper" tab, the install keeps `warp-oss.previous`, and on
+  "restart" Warper quit through its normal shutdown (SQLite writer, terminal server, LSP teardown)
+  and the new version started from the relauncher. A relauncher whose PID never exits gave up
+  silently after 60 s and the app kept running.
+- Unverified here: the macOS menu item, bundle replacement and relauncher (written but not compiled
+  or run on Linux; the suite runs on the macOS runner in CI) and a real GitHub release.
+
 ## 2026-10-21 — unused bundled assets
 
 - `warp_assets` gains a `lean` feature (enabled by the app's `lean` feature) that excludes

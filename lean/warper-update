@@ -1,0 +1,191 @@
+#!/bin/sh
+# Updates Warper from its GitHub releases. Warper itself never touches the network; this script
+# does, and only while you run it.
+set -eu
+
+repo=ragokan/warper
+api=${WARPER_UPDATE_API:-https://api.github.com/repos/$repo/releases/latest}
+download=${WARPER_UPDATE_DOWNLOAD:-https://github.com/$repo/releases/download}
+
+die() {
+    printf 'warper-update: %s\n' "$*" >&2
+    exit 1
+}
+
+ask() {
+    printf '%s [y/N] ' "$1"
+    read -r answer || answer=n
+    case $answer in [yY] | [yY][eE][sS]) return 0 ;; *) return 1 ;; esac
+}
+
+# True when $1 is a newer X.Y.Z than $2.
+is_newer() {
+    awk -v a="$1" -v b="$2" 'BEGIN {
+        split(a, x, "."); split(b, y, ".")
+        for (i = 1; i <= 3; i++) {
+            if (x[i] + 0 > y[i] + 0) exit 0
+            if (x[i] + 0 < y[i] + 0) exit 1
+        }
+        exit 1
+    }'
+}
+
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
+case $(uname -s)-$(uname -m) in
+    Linux-aarch64 | Linux-arm64) os=linux asset=warper-linux-arm64.tar.gz ;;
+    Darwin-arm64) os=macos asset=warper-macos-arm64.zip ;;
+    *) die "there is no Warper release for $(uname -s) $(uname -m)" ;;
+esac
+
+if [ "$os" = linux ]; then
+    # The script ships next to warp-oss, so it updates the install it belongs to.
+    app=${WARPER_APP:-$(cd "$(dirname "$(readlink -f "$0")")" && pwd)}
+    [ -x "$app/warp-oss" ] || die "$app/warp-oss not found; run warper-update from an installed Warper (portable copies cannot be updated in place)"
+    installed=$(cat "$app/VERSION" 2>/dev/null || true)
+else
+    bundle=${WARPER_APP:-$(cd "$(dirname "$0")/../.." && pwd)}
+    case $bundle in *.app) ;; *) die "run this from inside Warper.app (found $bundle)" ;; esac
+    installed=$(defaults read "$bundle/Contents/Info" CFBundleShortVersionString 2>/dev/null || true)
+fi
+printf '%s\n' "$installed" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || installed=
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/warper-update.XXXXXX")
+stage=
+keep_stage=
+# The staging dir holds the previous files; it is only removed once nothing in it is needed.
+cleanup() {
+    rm -rf "$work"
+    [ -z "$stage" ] || [ -n "$keep_stage" ] || rm -rf "$stage"
+}
+trap cleanup EXIT
+
+curl -fsSL -H 'Accept: application/vnd.github+json' -o "$work/release.json" "$api" ||
+    die "could not query $api"
+tag=$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$work/release.json" | head -n 1)
+latest=${tag#lean-v}
+latest=${latest%%[-+]*}
+printf '%s\n' "$latest" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' ||
+    die "the latest release tag '$tag' is not lean-vX.Y.Z"
+
+if [ -z "$installed" ]; then
+    echo "Installed version unknown (built from source); latest is $latest"
+elif is_newer "$latest" "$installed"; then
+    echo "Warper $latest is available (installed: $installed)"
+else
+    echo "Warper $installed is up to date"
+    exit 0
+fi
+echo "https://github.com/$repo/releases/tag/$tag"
+ask 'Install?' || exit 0
+
+curl -fSL -o "$work/$asset" "$download/$tag/$asset" || die "could not download $asset"
+curl -fsSL -o "$work/SHA256SUMS" "$download/$tag/SHA256SUMS" || die "the release has no SHA256SUMS"
+expected=$(awk -v f="$asset" '$2 == f || $2 == "*" f { print $1; exit }' "$work/SHA256SUMS")
+[ -n "$expected" ] || die "SHA256SUMS has no entry for $asset"
+[ "$(sha256_of "$work/$asset")" = "$expected" ] || die "checksum mismatch for $asset; nothing was installed"
+echo "Checksum verified"
+
+if [ "$os" = linux ]; then
+    parent=$(dirname "$app")
+    [ -w "$parent" ] && [ -w "$app" ] || die "$app and $parent must be writable to update"
+    stage=$(mktemp -d "$parent/.warper-update.XXXXXX")
+    mkdir "$work/extracted" "$stage/new" "$stage/old"
+    tar -xzf "$work/$asset" -C "$work/extracted"
+    package=$work/extracted/warper-linux-arm64
+    [ -x "$package/warper" ] || die "the archive has no warper binary"
+    # Stage the complete new install first, so the swap below is only renames and can be undone.
+    {
+        install -m 755 "$package/warper" "$stage/new/warp-oss" &&
+            install -m 755 "$package/warper-update" "$stage/new/warper-update" &&
+            cp -R "$package/resources" "$stage/new/resources" &&
+            printf '%s\n' "$latest" > "$stage/new/VERSION"
+    } || die "could not stage the new version; nothing was changed"
+    [ -s "$stage/new/warp-oss" ] && [ -d "$stage/new/resources" ] || die "the archive is incomplete; nothing was changed"
+
+    swapped=
+    swap_in() {
+        if [ -e "$app/$1" ]; then
+            mv "$app/$1" "$stage/old/$1" || return 1
+        fi
+        swapped="$swapped $1"
+        mv "$stage/new/$1" "$app/$1"
+    }
+    roll_back() {
+        for name in $swapped; do
+            if rm -rf "${app:?}/$name" && { [ ! -e "$stage/old/$name" ] || mv "$stage/old/$name" "$app/$name"; }; then
+                :
+            else
+                keep_stage=1
+            fi
+        done
+    }
+    # A rename keeps the running executable's (and this script's) inode valid until they exit.
+    for name in warp-oss warper-update VERSION resources; do
+        swap_in "$name" || {
+            roll_back
+            [ -z "$keep_stage" ] || die "Update failed and could not restore automatically; your previous files are in $stage/old"
+            die "could not install $name; the previous install was restored"
+        }
+    done
+    if ! mv "$stage/old/warp-oss" "$app/warp-oss.previous"; then
+        keep_stage=1
+        echo "warper-update: could not keep the previous binary; it is in $stage/old/warp-oss" >&2
+    fi
+    launch="$app/warp-oss"
+    echo "Installed Warper $latest (previous binary: $app/warp-oss.previous)"
+else
+    parent=$(dirname "$bundle")
+    [ -w "$parent" ] || die "$parent is not writable; move Warper.app somewhere you own and retry"
+    stage=$(mktemp -d "$parent/.warper-update.XXXXXX")
+    ditto -x -k "$work/$asset" "$stage"
+    [ -d "$stage/Warper.app" ] || die "the archive has no Warper.app"
+    codesign --verify --deep --strict "$stage/Warper.app" || die "the new Warper.app has an invalid signature"
+    previous=${bundle%.app}.previous.app
+    mv "$bundle" "$stage/previous.app"
+    if ! mv "$stage/Warper.app" "$bundle"; then
+        mv "$stage/previous.app" "$bundle"
+        die "could not move the new Warper.app into place; the old one was restored"
+    fi
+    placed=
+    if [ ! -e "$previous" ] || mv "$previous" "$stage/older.app"; then
+        mv "$stage/previous.app" "$previous" && placed=1
+    fi
+    if [ -z "$placed" ]; then
+        if [ -e "$stage/older.app" ]; then mv "$stage/older.app" "$previous" || true; fi
+        keep_stage=1
+        echo "warper-update: could not keep the previous version; it is in $stage" >&2
+    fi
+    echo "Installed Warper $latest (previous version: $previous)"
+fi
+
+# Warper passes its own PID when it opens this tab; a script run from another terminal has none.
+if [ -z "${WARPER_PID:-}" ] || ! ask 'Restart Warper now? Open tabs will close.'; then
+    echo "Warper $latest will start the next time you launch it."
+    exit 0
+fi
+
+if [ "$os" = macos ]; then
+    set -- open "$bundle"
+else
+    set -- "$launch"
+fi
+# The relauncher outlives Warper. It sends no signal: it waits (at most 60 s) for Warper to exit
+# and then starts the new version, or gives up silently. Warper kills the process group of a
+# finished command, so the relauncher needs its own session.
+relaunch='n=0; while kill -0 "$1" 2>/dev/null; do n=$((n + 1)); [ "$n" -le "$2" ] || exit 0; sleep 0.5; done; unset WARPER_PID WARPER_RESTART_FILE; shift 2; exec "$@"'
+set -- sh -c "$relaunch" sh "$WARPER_PID" $((2 * ${WARPER_RESTART_WAIT:-60})) "$@"
+if command -v setsid >/dev/null 2>&1; then
+    setsid nohup "$@" >/dev/null 2>&1 </dev/null &
+else
+    nohup perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' "$@" >/dev/null 2>&1 </dev/null &
+fi
+# Warper quits through its normal Quit action once it sees this file.
+[ -z "${WARPER_RESTART_FILE:-}" ] || : > "$WARPER_RESTART_FILE"
+echo "Restarting Warper..."

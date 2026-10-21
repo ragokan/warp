@@ -66,6 +66,7 @@ iconutil -c icns "$iconset" -o "$contents/Resources/WarpOss.icns"
 SETTINGS_SCHEMA_EXECUTABLE="$contents/MacOS/warp-oss" \
   script/prepare_bundled_resources "$contents/Resources" oss
 cp LICENSE-AGPL LICENSE-MIT "$contents/Resources/"
+install -m755 lean/warper-update "$contents/Resources/warper-update"
 
 codesign --force --deep -s - "$app"
 codesign --verify --deep --strict --verbose=2 "$app"

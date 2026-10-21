@@ -147,6 +147,13 @@ fn make_new_app_menu(ctx: &AppContext) -> Menu {
         ctx,
     )];
 
+    if cfg!(feature = "lean") {
+        menu_items.push(updateable_custom_item_without_checkmark(
+            CustomAction::CheckForUpdates,
+            ctx,
+        ));
+    }
+
     if !FeatureFlag::AvatarInTabBar.is_enabled() {
         menu_items.push(updateable_custom_item_without_checkmark(
             CustomAction::ToggleResourceCenter,

@@ -45,6 +45,29 @@ class VerifyBundleTests(unittest.TestCase):
                     self.assertEqual(plist["CFBundleIdentifier"], "dev.warp.WarpOss")
                     self.assertEqual({item["NSMenuItem"]["default"] for item in plist["NSServices"]}, {"New Warper Tab Here", "New Warper Window Here"})
 
+    def test_linux_package_version_from_release_tag(self):
+        source = Path(__file__).with_name("bundle-linux.sh").read_text()
+        snippet = source.split("# begin version\n", 1)[1].split("# end version\n", 1)[0]
+        for ref_type, tag, version in (
+            ("branch", "lean-ci", "0.1.0"),
+            ("tag", "lean-v1.2.3", "1.2.3"),
+            ("tag", "lean-v1.2.3-rc.1", "1.2.3"),
+            ("tag", "lean-v1.2.3+build.1", "1.2.3"),
+            ("tag", "lean-vbad", None),
+            ("tag", "lean-v1.2", None),
+            ("tag", "lean-v1.2.3-", None),
+        ):
+            with self.subTest(tag=tag):
+                result = subprocess.run(
+                    ["bash", "-c", snippet + 'printf %s "$version"'], capture_output=True, text=True,
+                    env=dict(os.environ, GITHUB_REF_TYPE=ref_type, GIT_RELEASE_TAG=tag),
+                )
+                if version is None:
+                    self.assertNotEqual(result.returncode, 0)
+                else:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, version)
+
     def test_macos_package_rejects_wrong_arch_and_bundle_identifier(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -58,6 +81,9 @@ class VerifyBundleTests(unittest.TestCase):
             (resources / "THIRD_PARTY_LICENSES.txt").write_text("licenses")
             (resources / "settings_schema.json").write_text("{}")
             (resources / "WarpOss.icns").write_bytes(b"icon")
+            updater = resources / "warper-update"
+            updater.write_text("#!/bin/sh\n")
+            updater.chmod(0o755)
             plugin = contents / "PlugIns/WarpDockTilePlugin.docktileplugin/Contents/MacOS"
             plugin.mkdir(parents=True)
             (plugin / "WarpDockTilePlugin").write_bytes(b"plugin")
@@ -101,6 +127,10 @@ class VerifyBundleTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 bundle.verify("macos", root)
             path.write_bytes(plistlib.dumps(plist))
+            updater.chmod(0o644)
+            with self.assertRaisesRegex(AssertionError, "Update script"):
+                bundle.verify("macos", root)
+            updater.chmod(0o755)
             (resources / "bin").mkdir()
             wrapper = resources / "bin/warp-oss"
             wrapper.write_text('#!/bin/bash\nexec "$script_dir/../../MacOS/warp-oss" "$@"\n')
@@ -135,6 +165,11 @@ class VerifyBundleTests(unittest.TestCase):
             (resources / "bundled").mkdir(parents=True)
             (resources / "THIRD_PARTY_LICENSES.txt").write_text("licenses")
             (resources / "settings_schema.json").write_text("{}")
+            updater = root / "warper-update"
+            updater.write_text("#!/bin/sh\n")
+            updater.chmod(0o755)
+            version = root / "VERSION"
+            version.write_text("0.1.0\n")
             system = "libc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x1234)"
             bundle.verify("linux", root, system)
             for marker in (b"lean-ci", b"lean-v1.2.3"):
@@ -142,6 +177,19 @@ class VerifyBundleTests(unittest.TestCase):
                 with self.subTest(marker=marker), self.assertRaisesRegex(AssertionError, "release marker"):
                     bundle.verify("linux", root, system)
             binary.write_bytes(header)
+            updater.unlink()
+            with self.assertRaisesRegex(AssertionError, "Update script"):
+                bundle.verify("linux", root, system)
+            updater.write_text("#!/bin/sh\n")
+            updater.chmod(0o755)
+            for content in ("", "v1.2.3\n", "1.2\n"):
+                version.write_text(content)
+                with self.subTest(version=content), self.assertRaisesRegex(AssertionError, "VERSION"):
+                    bundle.verify("linux", root, system)
+            version.unlink()
+            with self.assertRaisesRegex(AssertionError, "VERSION missing"):
+                bundle.verify("linux", root, system)
+            version.write_text("0.1.0\n")
             for invalid in (entry.replace("warposs", "warp"), entry.split("MimeType")[0]):
                 desktop.write_text(invalid)
                 with self.assertRaises(AssertionError):

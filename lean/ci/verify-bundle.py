@@ -44,6 +44,7 @@ def verify(platform, root, ldd=None):
             assert isinstance(plist.get(key), str) and plist[key], f"Missing {key}"
         binary = contents / "MacOS" / plist["CFBundleExecutable"]
         resources = contents / "Resources"
+        updater = resources / "warper-update"
         assert not (resources / "bin").exists(), "CLI wrappers must not ship in the lean bundle"
         assert (resources / plist["CFBundleIconFile"]).stat().st_size > 0
         plugin = contents / "PlugIns" / plist["NSDockTilePlugIn"]
@@ -55,6 +56,7 @@ def verify(platform, root, ldd=None):
     else:
         binary = root / "warper"
         resources = root / "resources"
+        updater = root / "warper-update"
         with binary.open("rb") as stream:
             header = stream.read(20)
         assert header[:6] == b"\x7fELF\x02\x01", "Expected little-endian ELF64"
@@ -68,6 +70,8 @@ def verify(platform, root, ldd=None):
             "Missing warposs MIME handler"
         )
         assert (root / "dev.warp.WarpOss.png").stat().st_size > 0
+        assert (root / "VERSION").is_file(), "VERSION missing"
+        assert re.fullmatch(r"\d+\.\d+\.\d+\n?", (root / "VERSION").read_text()), "Invalid VERSION"
         if ldd is not None:
             assert "not found" not in ldd, ldd
             libraries = re.findall(r"(/\S+)", ldd)
@@ -75,6 +79,7 @@ def verify(platform, root, ldd=None):
             for library in libraries:
                 assert library.startswith(("/lib/", "/lib64/", "/usr/lib/", "/usr/lib64/")), library
     assert binary.stat().st_mode & 0o111, "Binary is not executable"
+    assert updater.is_file() and updater.stat().st_mode & 0o111, "Update script missing or not executable"
     assert (resources / "bundled").is_dir(), "Bundled resources missing"
     assert (resources / "THIRD_PARTY_LICENSES.txt").stat().st_size > 0
     with (resources / "settings_schema.json").open() as stream:

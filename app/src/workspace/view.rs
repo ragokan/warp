@@ -287,6 +287,7 @@ use crate::env_vars::manager::{EnvVarCollectionManager, EnvVarCollectionSource};
 use crate::experiments::{BlockOnboarding, Experiment};
 use crate::launch_configs::launch_config::WindowTemplate;
 use crate::launch_configs::save_modal::{LaunchConfigModalEvent, LaunchConfigSaveModal};
+use crate::lean_update;
 use crate::menu::{
     Event as MenuEvent, MENU_VERTICAL_PADDING, Menu, MenuItem, MenuItemFields, MenuSelectionSource,
     MenuVariant,
@@ -10153,6 +10154,12 @@ impl Workspace {
             );
         }
         #[cfg(feature = "lean")]
+        items.push(
+            MenuItemFields::new("Check for Updates…")
+                .with_on_select_action(WorkspaceAction::CheckForUpdate)
+                .into_item(),
+        );
+        #[cfg(feature = "lean")]
         items.retain(|item| {
             if let MenuItem::Item(fields) = item {
                 !matches!(
@@ -15405,7 +15412,11 @@ impl Workspace {
         }
     }
 
-    fn manual_check_for_update(&self, ctx: &mut ViewContext<Self>) {
+    fn manual_check_for_update(&mut self, ctx: &mut ViewContext<Self>) {
+        if cfg!(feature = "lean") {
+            lean_update::open_update_tab(self, ctx);
+            return;
+        }
         AutoupdateState::handle(ctx).update(ctx, |autoupdate_state, ctx| {
             autoupdate_state.manually_check_for_update(ctx);
         });

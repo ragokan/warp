@@ -15,6 +15,13 @@ if [[ -f $app/warp-oss && ! -e $app/warp-oss.lean-v0.1.0 ]]; then
     cp -p "$app/warp-oss" "$app/warp-oss.lean-v0.1.0"
 fi
 install -m 755 "$binary" "$app/warp-oss"
+install -m 755 "$repo/lean/warper-update" "$app/warper-update"
+# A source build has no release version; a stale one would hide that from warper-update.
+if [[ -f $(dirname "$binary")/VERSION ]]; then
+    install -m 644 "$(dirname "$binary")/VERSION" "$app/VERSION"
+else
+    rm -f "$app/VERSION"
+fi
 install -m 644 "$repo/LICENSE-MIT" "$repo/LICENSE-AGPL" "$app/resources/"
 "$app/warp-oss" dump-settings-schema "$app/resources/settings_schema.json"
 install -m 644 "$repo/app/channels/oss/icon/no-padding/512x512.png" \

@@ -41,6 +41,7 @@ mod global_resource_handles;
 mod gpu_state;
 mod input_classifier;
 mod interval_timer;
+mod lean_update;
 mod linear;
 #[cfg(feature = "local_fs")]
 mod local_control;

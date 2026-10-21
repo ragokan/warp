@@ -39,7 +39,7 @@ jobs:
 
       - name: Check packaging logic
         run: |
-          for script in lean/ci/bundle-macos.sh lean/ci/bundle-linux.sh; do
+          for script in lean/ci/bundle-macos.sh lean/ci/bundle-linux.sh lean/warper-update; do
             bash -n "$script"
           done
           python3 -m unittest discover -s lean/ci -p '*_tests.py'
@@ -120,5 +120,6 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: |
+          (cd dist && sha256sum warper-* > SHA256SUMS)
           gh release create "$TAG" dist/* --verify-tag --draft --title "$TAG" \
             --notes 'Warper arm64 builds. macOS is ad-hoc signed and not notarized. See lean/ci/README.md for installation and verification limits.'

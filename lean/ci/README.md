@@ -33,6 +33,11 @@ gh workflow list --all --repo ragokan/warper
 gh workflow disable <new-workflow-id> --repo ragokan/warper
 ```
 
+The `draft-release` job also attaches `SHA256SUMS` for the archives and DMG. The in-app
+**Check for Updates…** command runs `warper-update`, which verifies the archive against it;
+`verify-bundle.py` requires the script in both packages and, for Linux, a `VERSION` file derived
+from the tag (a branch build gets `0.1.0`, like the macOS plist).
+
 ## macOS
 
 Extract `warper-macos-arm64.zip`, or mount the DMG, and move `Warper.app` to

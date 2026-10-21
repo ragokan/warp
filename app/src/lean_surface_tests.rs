@@ -78,6 +78,10 @@ fn lean_registered_surfaces_exclude_removed_features() {
             let schema: serde_json::Value = serde_json::from_str(&schema).unwrap();
             collect_forbidden_schema_names(&schema, &forbidden, &mut leftovers);
             assert!(leftovers.is_empty(), "removed surfaces remain:\n{}", leftovers.join("\n"));
+            assert!(
+                ctx.get_key_bindings().any(|binding| binding.name == "workspace:update_warper"),
+                "the update command is not registered"
+            );
         });
     });
 }

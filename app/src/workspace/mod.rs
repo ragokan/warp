@@ -1231,6 +1231,16 @@ pub fn init(app: &mut AppContext) {
     }
 
     app.register_editable_bindings([EditableBinding::new(
+        "workspace:update_warper",
+        "Check for Updates…",
+        WorkspaceAction::CheckForUpdate,
+    )
+    .with_group(bindings::BindingGroup::AutoUpdate.as_str())
+    .with_context_predicate(id!("Workspace"))
+    .with_enabled(|| cfg!(feature = "lean"))
+    .with_custom_action(CustomAction::CheckForUpdates)]);
+
+    app.register_editable_bindings([EditableBinding::new(
         "workspace:log_out",
         "Log out",
         WorkspaceAction::LogOut,

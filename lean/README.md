@@ -127,6 +127,40 @@ The round button at the top right opens the avatar menu. It shows `avatar.png`, 
 decoded, it shows the built-in gear icon. The image is looked up once per run and cropped to a
 circle; restart Warper after replacing it. No image ships with Warper.
 
+## Updates
+
+Warper never looks for updates itself. **Check for Updates…** (macOS: Warper menu; Linux: avatar
+menu; both: command palette) opens a tab that runs the bundled `warper-update` script. The script
+asks the GitHub releases of `ragokan/warper` for the latest `lean-vX.Y.Z` and says "up to date"
+unless it is newer than the installed version; otherwise it shows the version and release link
+and asks before doing anything. If the installed version is unknown it says so and asks too,
+instead of treating the release as an update. On yes it downloads the release archive and `SHA256SUMS`, aborts
+on a missing or mismatching checksum, installs, then asks whether to restart Warper now (open tabs
+close). On yes the script starts a detached relauncher that sends no signal: it waits up to 60 s
+for Warper's process to exit, then starts the new version, and Warper quits through its normal
+Quit action, so the usual shutdown and state save run. If Warper never exits (say, you cancel the
+quit prompt) the relauncher gives up silently. Answer no and the update applies the next time you
+launch it. The tab hands Warper's PID to the script, so run from another terminal the script just
+installs.
+
+- Linux: updates the install the script sits in (`warp-oss`, `warper-update`, `resources/` and
+  `VERSION` in one directory, `~/.local/lib/warp-lean` after `lean/install-linux.sh`); a portable
+  copy without `warp-oss` is refused. It stages the whole new install beside it, swaps the pieces
+  with renames and puts the old ones back if any step fails. The old binary is kept as
+  `warp-oss.previous` (replacing an older one); the other old pieces are replaced. If it cannot
+  restore them or keep the old binary it leaves them in the hidden `.warper-update.*` folder next
+  to the install and prints the path. If an update is interrupted (a SIGKILL or power loss between
+  the renames), the previous files are in that folder; move them back. The script finds its
+  install through symlinks too. `VERSION` comes
+  from the release tag: the release archive ships it and `lean/install-linux.sh` copies it, but
+  removes it for a source build, which the updater then reports as "installed version unknown
+  (built from source)".
+- macOS: replaces the running `Warper.app` in place, without sudo, keeping the previous app as
+  `Warper.previous.app` beside it (replacing an older one only once the new backup is in place;
+  delete it when you no longer need it).
+  If the app's folder is not writable it says so and stops. The installed version is the bundle's
+  `CFBundleShortVersionString`.
+
 ## Patches
 
 The terminal-focused removals are gated by `lean`. The behavior-preserving performance
@@ -151,6 +185,7 @@ fixes listed below also apply to default builds.
 | `app/src/drive/settings.rs` | Hides Drive surfaces without disabling settings sync. |
 | `app/src/lib.rs` | Never uses the platform keychain (the existing "unavailable" secure storage), so the app is always signed out; disables loopback HTTP, outlining/index restoration, Oz/agent/remote CLI modes custom AI endpoint initialization and AWS AI-credential subscriptions. Normal terminal-server workers remain available. |
 | `app/src/ui_components/avatar.rs`, `app/src/workspace/view.rs` | The avatar button shows the user's `avatar.png`/`.jpg`/`.jpeg` from the config directory, with the gear icon as fallback. |
+| `app/src/lean_update.rs`, `app/src/workspace/mod.rs`, `app/src/workspace/view.rs`, `app/src/app_menus.rs`, `app/src/util/bindings.rs` | Lean-only "Check for Updates…" command (macOS app menu, avatar menu, command palette) opening a tab that runs the bundled `warper-update`; Warper itself makes no request. |
 | `crates/settings/src/lib.rs` | GUI settings never sync to the cloud: the syncer runs in the same inert mode as the TUI's. |
 | `app/src/server/cloud_objects/listener.rs` | Never starts the cloud-objects websocket, even with objects cached from an earlier login. |
 | `crates/http_client/src/lib.rs` | Fail-safe: every client resolves hosts through a resolver that always fails and ignores proxies, so no request can leave the machine. |
