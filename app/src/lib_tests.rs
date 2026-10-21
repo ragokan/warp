@@ -253,6 +253,19 @@ fn launch_modes_select_expected_logging_frontend() {
 }
 
 #[test]
+fn only_lean_and_the_daemon_skip_secure_storage() {
+    let app = LaunchMode::App {
+        args: Default::default(),
+        api_key: None,
+    };
+    assert_eq!(app.uses_secure_storage(), !cfg!(feature = "lean"));
+    let daemon = LaunchMode::RemoteServerDaemon {
+        identity_key: String::new(),
+    };
+    assert!(!daemon.uses_secure_storage());
+}
+
+#[test]
 #[cfg(feature = "lean")]
 fn lean_gui_does_not_start_http_or_indexing() {
     let mode = LaunchMode::App {

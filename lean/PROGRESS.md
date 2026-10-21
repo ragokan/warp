@@ -1,5 +1,28 @@
 # Lean build progress
 
+## 2026-10-21 — fully offline
+
+- Warper no longer signs in or syncs. One lean gate registers the existing "unavailable" secure
+  storage, so startup never reads the keychain (always signed out) and no code path can delete
+  credentials an earlier Warper or Warp stored. Upstream's signed-out guards already stop workspace
+  polling, cloud-object polling and referral lookups; the settings syncer runs in its inert
+  (TUI) mode. Login-gated prompts, sign-up and log-out are inert (log-out deletes the local
+  database). Log out, Sign up, Settings sync, the Account page and `warposs://auth` are gone.
+- Fail-safe: `http_client` clients resolve hosts through a resolver that always fails and ignore
+  proxies, so any path missed above is refused before a connection opens.
+- Removed the now-dead poll-only/preference-only sync hunks (workspace poll, cloud-object filters,
+  duplicate-cleanup gate), the login-copy hunks and the `lean_preservation` syncer tests; seven
+  upstream tests that these hunks had broken under lean pass again. The cloud-objects listener keeps
+  its lean gate: objects cached from a v0.2.0 login would otherwise make it retry its websocket
+  (it fails at "missing authentication credentials" before connecting); a test covers cached objects.
+- Red/green (Docker, lean profile): six new or updated lean tests failed on the old tree (secure
+  storage, settings sync, login-gated prompt/log-out, loopback connection, registered surfaces,
+  URI allowlist) and pass now. Full lean `warp --lib` suite (hung modules skipped): baseline
+  9ff726424 has 355 failures, this tree 330; no test fails that did not fail at baseline (four
+  mockito tests in `server_api` are flaky at baseline as well). Twenty-two `terminal/view_tests.rs`
+  tests and six syncer tests that assert removed surfaces are lean-excluded.
+- Unverified here: the real desktop (no sign-in UI, settings live reload, zero TCP connections).
+
 ## 2026-10-21 — terminal performance plan
 
 - Selection-reset, cell-motion dedupe, glyph-cache hashing, PTY lock waiting, macOS
@@ -19,7 +42,6 @@
   no clang-format; Objective-C follows surrounding style and requires macOS CI.
 - Private logs and desktop/benchmark evidence stay under /tmp/warp-lean-evidence/perf/.
   Native macOS occlusion behavior and macOS bulk-output throughput require user hardware.
-
 
 ## 2026-10-21 — product removal, poll-only sync and Warper
 

@@ -301,6 +301,7 @@ impl Listener {
     }
 
     fn get_warp_drive_updates(&mut self, ctx: &mut ModelContext<Self>) {
+        // lean: no cloud websocket, even with cached objects from a v0.2.0 login.
         if cfg!(feature = "lean") {
             return;
         }

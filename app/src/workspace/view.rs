@@ -23942,6 +23942,9 @@ impl Workspace {
         entrypoint: AnonymousUserSignupEntrypoint,
         ctx: &mut ViewContext<Self>,
     ) {
+        if cfg!(feature = "lean") {
+            return;
+        }
         if self.auth_state.is_user_anonymous().unwrap_or_default() {
             // User has a Firebase anonymous account — use the linking flow.
             AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {

@@ -182,6 +182,14 @@ impl Client {
     }
 
     pub fn from_client_builder(client_builder: reqwest::ClientBuilder) -> reqwest::Result<Self> {
+        #[cfg(not(target_family = "wasm"))]
+        let client_builder = if warp_core::warpui_core::lean::IS_LEAN {
+            client_builder
+                .no_proxy()
+                .dns_resolver(Arc::new(OfflineResolver))
+        } else {
+            client_builder
+        };
         client_builder.build().map(|client| Self {
             wrapped: client,
             include_warp_headers: true,
@@ -420,6 +428,17 @@ impl Client {
         }
 
         Ok(Response(result))
+    }
+}
+
+/// Fails every host lookup so that an offline build never opens a connection.
+#[cfg(not(target_family = "wasm"))]
+struct OfflineResolver;
+
+#[cfg(not(target_family = "wasm"))]
+impl reqwest::dns::Resolve for OfflineResolver {
+    fn resolve(&self, _name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        Box::pin(async { Err("offline build: network access is disabled".into()) })
     }
 }
 

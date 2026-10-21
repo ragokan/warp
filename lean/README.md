@@ -1,10 +1,10 @@
 # Warper
 
-A terminal-focused `warp-oss` build from branch `lean`. Account login and cloud settings sync
-remain upstream implementations. Stable Warp's files are read only and are never used as the
-OSS authentication store. `master` stays at upstream; nothing is pushed by this tooling.
+A terminal-focused, **fully offline** `warp-oss` build from branch `lean`. It never signs in,
+never contacts Warp's servers and takes its settings only from the local `settings.toml`. Stable
+Warp's files are read only. `master` stays at upstream; nothing is pushed by this tooling.
 
-Display name: **Warper**; app IDs, data directories, login scheme and icons are unchanged.
+Display name: **Warper**; app IDs, data directories, URL scheme and icons are unchanged.
 Releases use `warper-macos-arm64.zip` / `.dmg` and `warper-linux-arm64.tar.gz` (`warper` binary).
 The installer preserves `warp-oss.lean-v0.1.0` for rollback.
 
@@ -38,7 +38,7 @@ ownership of those two volumes to uid/gid 1000. Never mount over `.cargo` or `.r
 hide the image's Rust toolchain. The target directory is `target/lean`, already gitignored.
 Do not run `script/run`, bootstrap, or reference-fork code for this build.
 
-## Install and login
+## Install
 
 ```sh
 lean/install-linux.sh
@@ -46,9 +46,9 @@ lean/install-linux.sh
 
 The installer puts the binary in `~/.local/lib/warp-lean/warp-oss`, adds
 `~/.local/bin/warper`, installs the OSS icon and a desktop launcher, generates the settings
-schema beside the executable, and registers `warposs://` for login callbacks. Terminal fonts,
-shell bootstrap and normal UI assets are embedded by the upstream release asset provider.
-No Oz skills or remote-server binaries are installed.
+schema beside the executable, and registers `warposs://` for opening tabs, windows and settings.
+Terminal fonts, shell bootstrap and normal UI assets are embedded by the upstream release asset
+provider. No Oz skills or remote-server binaries are installed.
 
 OSS directories follow XDG overrides, otherwise:
 
@@ -61,36 +61,56 @@ The installer copies missing `settings.toml` and `keybindings.yaml` files and th
 directory from the corresponding `warp-terminal` directories. Existing OSS copies are preserved.
 Legacy `user_preferences.json` is omitted because it contains free-form saved prompts and cannot be
 established to be secret-free. No auth files, tokens, keychain entries or databases are migrated.
-Login therefore needs its own browser callback. The fixed loopback HTTP server is only for
-installation detection and profiling; authentication uses the registered URL scheme.
 
-Settings sync remains enabled when the copied `account.is_settings_sync_enabled`
-setting is true. The Account page exposes it after login. Preference startup fetches, the 600-second poll with 20% jitter and uploads remain. The
-cloud-object websocket is disabled; workspace metadata keeps initial/on-demand fetches only.
-Other-device changes arrive within about 10–12 minutes. There is no catch-up refresh after
-wake from sleep; network-online events still trigger a poll. Sync uses last-write-wins: a local
-edit shortly after another device edits the same key can be overwritten at the next poll.
-Workspace/enterprise metadata refreshes only at startup or on demand.
+## Offline
 
-Turning Settings sync off and then on uses upstream `ForceCloudToMatchLocal`: registered cloud
-settings are overwritten with this lean installation's local values; excluded keys are untouched. The first install copied the
-stable installation's settings; review local choices before toggling sync back on.
+Warper has no account. Startup never reads the keychain, so the app is always signed out, and
+there is no sign-in, sign-up, Log out, Account page or Settings sync toggle. `warposs://auth` links
+and `warposs://settings/account` are ignored. Settings live only in `settings.toml`
+(`~/.config/warp-oss/settings.toml`, `~/.warp-oss/settings.toml` on macOS); sync it between
+machines with your dotfiles. Edits to the file are picked up while Warper runs. The
+`account.is_settings_sync_enabled` key is hidden and ignored.
+
+The gates, each reusing an upstream code path:
+
+- The secure-storage service is the existing "unavailable" provider (the one the remote daemon
+  uses): reads find nothing and writes/removals are no-ops. Warper therefore never signs in and
+  can never delete credentials that an earlier Warper or Warp stored.
+- Upstream already skips workspace polling, cloud-object polling, referral lookups and the
+  login-gated prompts while signed out. Login-gated prompts and `auth::log_out` (which deletes the
+  local database) are additionally inert under lean.
+- The settings syncer runs in its inert mode (`SettingsMode::should_sync_to_cloud`, as for the
+  TUI), so it neither reads from nor writes to the cloud.
+- Telemetry, crash reporting, autoupdate and the changelog were already off.
+- As a fail-safe, every `http_client::Client` resolves hostnames through a resolver that always
+  fails and ignores proxies, so a request that bypasses the gates above is refused before it opens
+  a connection. WebSocket users are all behind the disabled surfaces. The guard is name-based: it
+  does not stop a request to a literal IP address, which is blocked in practice only because no
+  lean code makes one.
+
+Older Warper builds stored a login in the platform keychain. Warper leaves it alone; delete it
+yourself if you want it gone. On Linux, remove the `dev.warp.WarpOss` entries in your keyring
+(for example with Seahorse), and `~/.local/state/warp-oss/dev.warp.WarpOss-*` if the keyring was
+unavailable. On macOS, delete the `dev.warp.WarpOss` items in Keychain Access.
+
+## Hidden surfaces
 
 Lean also hides AI/Drive/MCP/notebooks, analytics/crash-reporting actions, sharing, teams,
 billing and referrals from bindings, slash commands, menus, tips, login copy, banners,
 tooltips and the settings schema.
-Hidden preferences remain stored: registration excludes them from sync and duplicate cleanup;
-the TOML backend refuses their writes/deletes while preserving the loaded document.
-Lean no longer performs the legacy privacy migration or GetUserSettings, so eleven upstream
-tests are lean-excluded: ten passed at c13eb5653; duplicate-cleanup already failed there because
-it expected a fourth operation for the cloud-agent timestamp fetch that lean skips.
+Hidden preferences remain stored: registration excludes them and the TOML backend refuses their
+writes/deletes while preserving the loaded document.
+Lean no longer performs the legacy privacy migration or GetUserSettings, and its settings
+syncer is inert, so seventeen upstream syncer tests are lean-excluded, as are twenty-two in
+`terminal/view_tests.rs` that assert Agent Mode, CLI-agent and Vim-banner behavior; all run with
+default features.
 Ten other upstream tests are lean-excluded: four in
 `search/slash_command_menu/static_commands/commands_tests.rs` assert removed slash commands;
 six in `util/openable_file_type_tests.rs` assert Warp editor/viewer behavior. All remain
 enabled with default features.
 `notifications.preferences` is the preservation exception: its full compound schema/value
-remains so ordinary terminal notifications still persist and sync; the agent row is hidden.
-GetReferralInfo remains enabled because the theme chooser still offers referral-unlocked themes.
+remains so ordinary terminal notifications still persist; the agent row is hidden. Referral
+themes that an earlier login already unlocked stay unlocked; no new referral lookup is made.
 
 Also hidden: local/cloud workflows; Warp's editor/review/file tree and Markdown viewer;
 tab/launch configurations, groups/pins/colours/vertical tabs; block bookmarks/filter/sticky
@@ -109,7 +129,7 @@ fixes listed below also apply to default builds.
 | `Cargo.toml` | Stripped release-derived `lean` profile with ThinLTO. |
 | `app/Cargo.toml` | `lean` feature forwards the executor limit to `warpui_core`. |
 | `crates/warpui_core/Cargo.toml` | Adds opt-in `lean` feature. |
-| `crates/warpui_core/src/lean.rs`, `keymap.rs`, `platform/menu.rs`, `crates/warp_core/src/context_flag.rs` | Central lean surface/settings policy, binding/menu filters and disabled legacy contexts. |
+| `crates/warpui_core/src/lean.rs`, `keymap.rs`, `platform/menu.rs`, `crates/warp_core/src/context_flag.rs` | Central lean surface/settings policy, binding/menu filters and disabled legacy contexts; also hides Log out, Sign up, Settings sync, the Account page binding and the `account.is_settings_sync_enabled` key. |
 | `crates/warpui/src/platform/mac/menus.rs` | Reads the shared display-name helper for macOS app-menu labels. |
 | `crates/warpui_core/src/ui_components/link.rs` | Filters hidden help links while keeping privacy links. |
 | `crates/settings/src/registration.rs`, `crates/warpui_extras/src/user_preferences/toml_backed.rs` | Excludes hidden settings from registration and prevents writes/deletes without changing the loaded document. |
@@ -120,12 +140,13 @@ fixes listed below also apply to default builds.
 | `app/src/settings/ai.rs` | Effective AI availability is always false, including after login; stored choices remain intact. |
 | `app/src/settings/privacy.rs` | Effective collection stays off; legacy privacy fetch/migration cannot overwrite stored or synced choices. Secret-regex initialization remains. |
 | `app/src/drive/settings.rs` | Hides Drive surfaces without disabling settings sync. |
-| `app/src/lib.rs` | Keeps Linux login callback forwarding without `release_bundle`; disables loopback HTTP, outlining/index restoration, Oz/agent/remote CLI modes custom AI endpoint initialization and AWS AI-credential subscriptions. Normal terminal-server workers remain available. |
-| `app/src/server/server_api/object.rs` | Skips parsing AI/MCP/cloud-agent generic objects from the shared settings-sync response. |
-| `app/src/server/cloud_objects/update_manager.rs` | Applies only preference generic objects, rejects non-preference websocket content updates, ignores the MCP gallery, and stops cloud-agent environment timestamp fetches. Folder/account metadata and settings synchronization remain enabled. |
-| `app/src/server/cloud_objects/listener.rs`, `app/src/workspaces/update_manager.rs` | Disables the cloud-object websocket and repeat workspace-metadata poll; keeps initial/on-demand metadata fetches. |
+| `app/src/lib.rs` | Never uses the platform keychain (the existing "unavailable" secure storage), so the app is always signed out; disables loopback HTTP, outlining/index restoration, Oz/agent/remote CLI modes custom AI endpoint initialization and AWS AI-credential subscriptions. Normal terminal-server workers remain available. |
+| `crates/settings/src/lib.rs` | GUI settings never sync to the cloud: the syncer runs in the same inert mode as the TUI's. |
+| `app/src/server/cloud_objects/listener.rs` | Never starts the cloud-objects websocket, even with objects cached from an earlier login. |
+| `crates/http_client/src/lib.rs` | Fail-safe: every client resolves hosts through a resolver that always fails and ignores proxies, so no request can leave the machine. |
+| `app/src/auth/auth_manager.rs`, `app/src/auth/mod.rs`, `app/src/workspace/view.rs` | Login-gated prompts, sign-up and log-out are inert; log-out would delete the local database. |
 | `app/src/menu.rs`, `app/src/settings_view/settings_page.rs`, `app/src/settings/schema_generation.rs` | Filters menu entries, settings widgets and schema keys through the central lean policy. |
-| `app/src/util/openable_file_type.rs`, `app/src/banner/view.rs`, `app/src/tab.rs`, `app/src/tips/tip_view.rs`, `app/src/auth/*` | Uses external file openers and hides removed-feature banners, tab actions, tips and login copy. |
+| `app/src/util/openable_file_type.rs`, `app/src/banner/view.rs`, `app/src/tab.rs`, `app/src/tips/tip_view.rs` | Uses external file openers and hides removed-feature banners, tab actions and tips. |
 | `app/src/system/info.rs` | Stops five-second process-stat sampling; retains the model and initial reading for normal consumers. |
 | `app/src/ai/mcp/templatable_manager.rs` | Allows the unused legacy-conversion event only under lean, where its cloud producer is excluded. |
 | `app/src/ai/mcp/templatable_manager/native.rs` | Skips the cloud subscription that can migrate/delete MCP objects, restore/migration, built-in Factory MCP and every actual MCP spawn, including explicit spawn requests. |
@@ -136,11 +157,10 @@ fixes listed below also apply to default builds.
 | `app/src/ai/connected_self_hosted_workers.rs` | No cloud-worker discovery requests. |
 | `app/src/ai/request_usage_model.rs` | No AI credit/usage requests after login or activation. |
 | `app/src/ai/execution_profiles/profiles.rs` | Uses inert local CLI profile state; no AI profile migration or cloud writes. |
-| `app/src/settings_view/mod.rs` | Constructs only Account, Appearance, Features, Keybindings, Privacy and About and registers only their palette actions; excluded AI/billing pages cannot start fetches. |
+| `app/src/settings_view/mod.rs` | Constructs only Appearance, Features, Keybindings, Privacy and About (no Account page) and registers only their palette actions; excluded AI/billing pages cannot start fetches. |
 | `app/src/settings_view/update_environment_form.rs` | Suppresses hidden cloud-environment GitHub discovery, including initialization and refocus triggers. |
 | `app/src/settings_view/privacy_page.rs` | Hides controls for unavailable telemetry, crash and cloud AI collection. |
 | `app/src/settings_view/appearance_page.rs` | Hides agent/notebook font, Drive and agent-tab options, including their palette toggles; the central widget filter also hides Project Explorer. |
-| `app/src/settings_view/main_page.rs` | Hides AI-plan upsells/referrals while retaining login, logout and settings sync. |
 | `app/src/settings_view/features_page.rs` | Hides changelog and agent notification controls; retains command notifications. |
 | `app/src/terminal/view/init.rs` | Disables unconditional latest-agent-message and save-to-Drive shortcut commands. |
 | `app/src/terminal/buy_credits_banner.rs` | Hides the AI-credit purchase banner, including the logged-in zero-credit state. |
@@ -148,9 +168,9 @@ fixes listed below also apply to default builds.
 | `app/src/workspace/mod.rs` | Disables hidden settings/Drive search shortcuts and macOS Oz install actions. |
 | `app/src/terminal/universal_developer_input.rs` | Hides the AI mode/context/model toolbar while keeping the normal command editor and saved input style. |
 | `app/src/workspace/view.rs` | Hides and disables the legacy AI assistant fallback and removes changelog/billing/referral menu entries. |
-| `app/src/uri/mod.rs` | Ignores AI, cloud-agent, MCP, Drive and shared-session deep links; keeps auth and normal terminal URLs. |
+| `app/src/uri/mod.rs` | Ignores AI, cloud-agent, MCP, Drive, shared-session and auth deep links and the Account settings route; keeps normal terminal URLs. |
 | `app/src/changelog_model.rs` | Rejects every changelog request, including explicit actions. |
-| `app/src/app_services/linux/mod.rs` | Enables existing single-instance URL forwarding for lean Linux login callbacks. |
+| `app/src/app_services/linux/mod.rs` | Enables existing single-instance URL forwarding so a second launch hands its arguments to the running Warper. |
 | `app/src/terminal/view.rs` | Drops intercepted `warp://cli-agent` OSC 777 payloads without registering listeners. Lean Linux caps terminal wakeups at 30/s for software rendering; other builds keep 60/s. |
 | `app/src/terminal/alt_screen/alt_screen_element.rs` | Lean skips background-color sampling for its hidden footer consumers. |
 | `app/src/features_lean_tests.rs`, `app/src/lib_tests.rs`, `app/src/settings/{ai,privacy}_tests.rs`, `app/src/uri/uri_tests.rs`, `app/src/settings_view/update_environment_form_tests.rs` | Policy, startup, privacy and hidden network-fetch regression checks. |

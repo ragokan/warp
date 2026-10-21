@@ -1119,16 +1119,14 @@ fn test_decode_uuid_hex_rejects_invalid_chars() {
 
 #[test]
 #[cfg(feature = "lean")]
-fn lean_uri_allowlist_keeps_auth_terminal_and_settings_routes() {
+fn lean_uri_allowlist_keeps_terminal_and_settings_routes() {
     for (host, path) in [
-        (UriHost::Auth, "/desktop_redirect"),
         (UriHost::Session, "/session-id"),
         (UriHost::Action, "/new_tab"),
         (UriHost::Action, "/new_window"),
         (UriHost::Action, "/docker/open_subshell"),
         (UriHost::Settings, ""),
         (UriHost::Settings, "/"),
-        (UriHost::Settings, "/account"),
         (UriHost::Settings, "/appearance"),
         (UriHost::Settings, "/features"),
         (UriHost::Settings, "/keybindings"),
@@ -1143,6 +1141,7 @@ fn lean_uri_allowlist_keeps_auth_terminal_and_settings_routes() {
 #[cfg(feature = "lean")]
 fn lean_uri_allowlist_rejects_disabled_hosts_and_actions() {
     for (host, path) in [
+        (UriHost::Auth, "/desktop_redirect"),
         (UriHost::Launch, "/config.yaml"),
         (UriHost::TabConfig, "/config.yaml"),
         (UriHost::Action, "/open_file_editor"),
@@ -1164,6 +1163,7 @@ fn lean_uri_allowlist_rejects_disabled_hosts_and_actions() {
         (UriHost::Action, "/auto-handoff-to-cloud"),
         (UriHost::Action, "/open-repo"),
         (UriHost::Action, "/unknown"),
+        (UriHost::Settings, "/account"),
         (UriHost::Settings, "/ai"),
         (UriHost::Settings, "/billing"),
         (UriHost::Settings, "/mcp"),

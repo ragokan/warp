@@ -26,7 +26,7 @@ use crate::drive::DriveIndexVariant;
 use crate::drive::folders::{CloudFolderModel, FolderId};
 use crate::features::FeatureFlag;
 use crate::notebooks::{CloudNotebookModel, NotebookId};
-use crate::server::cloud_objects::listener::ObjectUpdateMessage;
+use crate::server::cloud_objects::listener::{Listener, ObjectUpdateMessage};
 use crate::server::cloud_objects::update_manager::InitialLoadResponse;
 use crate::server::ids::{ServerId, ServerIdAndType};
 use crate::server::server_api::ServerApiProvider;
@@ -1167,6 +1167,26 @@ fn test_collapse_all_in_trash() {
             assert!(!folder_5.model().is_open);
             assert!(!folder_6.model().is_open);
             assert!(!folder_7.model().is_open);
+        });
+    })
+}
+
+#[cfg(feature = "lean")]
+#[test]
+fn lean_never_starts_the_cloud_listener_even_with_cached_objects() {
+    App::test((), |mut app| async move {
+        let cached = mock_cloud_notebook(SyncId::ServerId(1.into()), "cached".into(), None);
+        initialize_app(
+            &mut app,
+            vec![Box::new(cached)],
+            Arc::new(base_mock_cloud_object_server_api()),
+        );
+
+        let listener =
+            app.add_model(|ctx| Listener::new(Arc::new(base_mock_cloud_object_server_api()), ctx));
+
+        listener.read(&app, |listener, _| {
+            assert!(!listener.has_current_subscription_abort_handle());
         });
     })
 }

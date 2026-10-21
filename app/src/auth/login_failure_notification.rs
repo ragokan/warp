@@ -25,9 +25,6 @@ impl LoginFailureReason {
         fn with_troubleshooting_text(
             mut fragments: Vec<FormattedTextFragment>,
         ) -> Vec<FormattedTextFragment> {
-            if cfg!(feature = "lean") {
-                return fragments;
-            }
             fragments.extend([
                 FormattedTextFragment::plain_text(" Not the first time? See our "),
                 FormattedTextFragment::hyperlink(

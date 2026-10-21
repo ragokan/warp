@@ -51,6 +51,10 @@ pub fn surface_is_allowed(name: &str, description: &str) -> bool {
                 "learn more",
                 "more info",
                 "contact support",
+                "log out",
+                "sign up",
+                "settings sync",
+                "settings: account",
             ]
             .iter()
             .any(|phrase| description.to_ascii_lowercase().contains(phrase))
@@ -142,6 +146,7 @@ pub fn setting_is_allowed(hierarchy: Option<&str>, key: &str) -> bool {
         && !matches!(
             path.as_str(),
             "appearance.theme"
+                | "account.is_settings_sync_enabled"
                 | "general.autoupdate_enabled"
                 | "terminal.show_terminal_zero_state_block"
                 | "general.default_session_mode"
@@ -163,7 +168,6 @@ pub fn slash_is_allowed(name: &str) -> bool {
             name,
             "/theme"
                 | "/exit"
-                | "/logout"
                 | "/view-logs"
                 | "/open-settings-file"
                 | "/rename-tab"

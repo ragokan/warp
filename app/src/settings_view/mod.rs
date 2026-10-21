@@ -1258,7 +1258,6 @@ impl SettingsView {
                 me.handle_menu_event(event, ctx);
             });
             let settings_pages = vec![
-                SettingsPage::new(main_page_handle),
                 SettingsPage::new(appearance_page_handle),
                 SettingsPage::new(features_page_handle),
                 SettingsPage::new(keybindings_handle),
@@ -1267,7 +1266,7 @@ impl SettingsView {
             ];
             let initial_page = page
                 .filter(|section| settings_pages.iter().any(|page| page.section == *section))
-                .unwrap_or_default();
+                .unwrap_or(SettingsSection::Appearance);
             return Self {
                 pages_filter: settings_pages
                     .iter()
@@ -2184,8 +2183,7 @@ impl SettingsView {
         #[cfg(feature = "lean")]
         if !matches!(
             settings_page.section,
-            SettingsSection::Account
-                | SettingsSection::Appearance
+            SettingsSection::Appearance
                 | SettingsSection::Features
                 | SettingsSection::Keybindings
                 | SettingsSection::Privacy

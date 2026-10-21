@@ -306,7 +306,7 @@ impl TeamUpdateManager {
                 let should_poll_again = !res.has_pending_retries();
                 let _ = update_manager.handle_workspace_metadata_with_request_state(res, ctx);
 
-                if should_poll_again && !cfg!(feature = "lean") {
+                if should_poll_again {
                     let next_poll_handle = ctx.spawn(
                         async move {
                             Timer::after(duration_with_jitter(

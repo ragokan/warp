@@ -91,9 +91,6 @@ pub fn init(app: &mut AppContext) {
 
 impl LoginPurpose {
     fn copy(self) -> (&'static str, &'static str) {
-        if cfg!(feature = "lean") {
-            return ("Sign in", "Sync your terminal settings across devices.");
-        }
         match self {
             LoginPurpose::WarpDrive => (
                 "Get started with Warp Drive",
@@ -587,9 +584,6 @@ impl LoginSlideView {
     /// dropped from the wording on paths that don't enable AI (e.g.
     /// Terminal+Drive), since there are no AI features to opt out of there.
     fn privacy_disclaimer_prefix(&self) -> &'static str {
-        if cfg!(feature = "lean") {
-            return "You can review your ";
-        }
         if self.ai_enabled {
             "If you'd like to opt out of analytics and AI features, you can adjust your "
         } else {
@@ -802,13 +796,7 @@ impl LoginSlideView {
 
         let cmd_enter = Keystroke::parse("cmdorctrl-enter").unwrap_or_default();
         let skip_label = match self.login_purpose() {
-            LoginPurpose::WarpDrive => {
-                if cfg!(feature = "lean") {
-                    "Skip for now"
-                } else {
-                    "Disable Warp Drive"
-                }
-            }
+            LoginPurpose::WarpDrive => "Disable Warp Drive",
             LoginPurpose::WarpAgent => "Skip for now",
             LoginPurpose::ThirdParty => "Skip for now",
             LoginPurpose::AccountFirst => "Skip",
@@ -1118,12 +1106,6 @@ impl LoginSlideView {
             &'static [&'static str],
             &'static str,
         ) = match self.login_purpose() {
-            _ if cfg!(feature = "lean") => (
-                "Continue without signing in?",
-                "Sign in anytime to sync your terminal settings.",
-                &[],
-                "Sign in",
-            ),
             LoginPurpose::WarpDrive => (
                 "Are you sure you want to disable Warp Drive?",
                 "Warp Drive lets you save workflows and knowledge across devices and share them with your team. By continuing, you won't have access to the following features:",

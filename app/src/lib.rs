@@ -623,6 +623,11 @@ impl LaunchMode {
         !cfg!(feature = "lean") && self.is_gui()
     }
 
+    /// Returns `true` if this process may read or write the platform keychain.
+    fn uses_secure_storage(&self) -> bool {
+        !cfg!(feature = "lean") && !matches!(self, LaunchMode::RemoteServerDaemon { .. })
+    }
+
     /// Returns `true` if this process can build and sync codebase indices.
     fn supports_indexing(&self) -> bool {
         if cfg!(feature = "lean") {
@@ -1527,7 +1532,7 @@ pub(crate) fn initialize_app(
     // Daemon auth arrives through the client handshake, so avoid platform keychains that may
     // require an interactive unlock prompt. Other headless modes still use secure storage for
     // persisted login and BYO provider credentials.
-    if matches!(launch_mode, LaunchMode::RemoteServerDaemon { .. }) {
+    if !launch_mode.uses_secure_storage() {
         warpui_extras::secure_storage::register_unavailable(ctx);
     } else {
         // Register an implementation of the secure storage service.

@@ -3461,6 +3461,7 @@ fn escape_does_not_exit_local_agent_view_with_long_running_command() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn root_cloud_mode_pane_sets_root_cloud_mode_context_key() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -3553,6 +3554,7 @@ fn set_input_mode_agent_does_not_enter_local_agent_from_root_cloud_mode_pane() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn cloud_mode_v1_agent_prefixed_query_spawns_cloud_agent() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -3597,6 +3599,7 @@ fn cloud_mode_v1_agent_prefixed_query_spawns_cloud_agent() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn cloud_mode_v2_agent_prefixed_query_spawns_cloud_agent() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -3904,6 +3907,7 @@ fn shared_third_party_viewer_syncs_from_cli_agent_state_without_ambient_model() 
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn cloud_mode_followup_input_uses_explicit_submit_event_even_when_view_pending() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -4144,6 +4148,7 @@ fn cloud_mode_failed_keeps_queued_query_above_tombstone_and_hides_input() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn cmd_enter_from_terminal_without_selected_block_enters_agent_view() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -4202,6 +4207,7 @@ fn cmd_enter_from_terminal_without_selected_block_enters_agent_view() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn cmd_enter_from_terminal_with_selected_block_enters_agent_view_with_context() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -4289,6 +4295,7 @@ fn cmd_enter_from_terminal_with_selected_block_enters_agent_view_with_context() 
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn cmd_enter_from_active_non_empty_agent_view_requires_confirmation() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -6875,6 +6882,7 @@ fn test_bash_vim_banner_already_shown() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Vim mode
 fn test_bash_vim_banner_on() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -6988,6 +6996,7 @@ fn test_bash_vim_banner_off() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Vim mode
 fn test_zsh_vim_banner_on() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -7101,6 +7110,7 @@ fn test_zsh_vim_banner_off() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Vim mode
 fn test_fish_vim_banner_on() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -7372,6 +7382,7 @@ fn test_prompt_context_menu_items_for_agent_toolbelt_flag() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn agent_footer_updates_chip_groups_when_side_assignment_changes() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -7566,6 +7577,7 @@ fn test_scroll_position_doesnt_change_when_block_finished() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn inline_agent_view_exits_when_tagged_in_long_running_command_is_tagged_out() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -8209,6 +8221,7 @@ fn inline_agent_view_persists_across_transfer_takeover_for_monitored_long_runnin
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn use_agent_footer_renders_for_transfer_handoff_even_when_user_command_footer_setting_disabled() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -8338,6 +8351,7 @@ fn exiting_agent_view_removes_empty_conversations() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn ctrl_c_exit_agent_view_requires_confirmation() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -8386,6 +8400,7 @@ fn ctrl_c_exit_agent_view_requires_confirmation() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn ctrl_c_buffer_clear_then_exit_requires_three_presses_in_agent_view() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -8444,6 +8459,7 @@ fn ctrl_c_buffer_clear_then_exit_requires_three_presses_in_agent_view() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn terminal_action_ctrl_c_exit_agent_view_requires_confirmation() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -8567,6 +8583,7 @@ fn open_cli_agent_rich_input_for_agent_with_window_id(
 /// focused editor context. This is a regression test for #9286 where the
 /// keybinding only matched the terminal context, not the embedded editor.
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn ctrl_g_closes_cli_agent_rich_input_when_editor_is_focused() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -8614,6 +8631,7 @@ fn ctrl_g_closes_cli_agent_rich_input_when_editor_is_focused() {
 /// block had transitioned out of `LongRunningCommand` — for example, when the
 /// CLI agent has paused waiting for user input.
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn ctrl_g_closes_cli_agent_rich_input_from_terminal_context() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -8658,6 +8676,7 @@ fn ctrl_g_closes_cli_agent_rich_input_from_terminal_context() {
 /// Verifies that Ctrl-G is a true toggle: opens then closes rich input from
 /// the terminal context. Regression test for #9916.
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn ctrl_g_toggles_cli_agent_rich_input_from_terminal_context() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -9272,6 +9291,7 @@ fn submit_with_plugin_but_auto_toggle_off_respects_auto_dismiss() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn status_blocked_auto_closes_rich_input() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -9350,6 +9370,7 @@ fn status_blocked_auto_closes_rich_input() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn status_in_progress_auto_opens_rich_input_after_blocked() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -10851,6 +10872,7 @@ fn set_warp_tui_session(view: &mut TerminalView, ctx: &mut ViewContext<TerminalV
 }
 
 #[test]
+#[cfg(not(feature = "lean"))] // lean removes Agent Mode and CLI agents
 fn warp_tui_listener_does_not_auto_open_rich_input() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);

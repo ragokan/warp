@@ -58,7 +58,7 @@ fn lean_registered_surfaces_exclude_removed_features() {
             crate::notebooks::init(ctx);
 
             let forbidden = Regex::new(
-                r"(?i)(?:^|[^a-z])(code[_ -]view|new[_ -]file|save[_ -]file|open[_ -]repository|global[_ -]search|code[_ -]as[_ -]default[_ -]editor|conversations?|cli[_ -]responses|go[_ -]to[_ -]line|left[_ -]panel|help|blog|docs|learn[_ -]more|more[_ -]info|open[_ -]in[_ -]warp|workflows?|vim|markdown|bookmarks?|sticky|compact mode|changelog|feedback|slack|community|documentation|vertical[_ -]tabs|tab[_ -]groups?|pinned[_ -]tabs|command[_ -]corrections|error[_ -]underlining|@.*context[_ -]menu|code[_ -]editor|code[_ -]review|project[_ -]explorer|file[_ -]editor|block[_ -]filter|filter[_ -]block|tab[_ -]configs?|launch[_ -]configurations?|tab[_ -]colou?rs?|pin[_ -]tab|ai|agents?|llm|mcp|oz|drive|notebooks?|telemetry|analytics|crash reporting|shar(?:e|ed|ing)|billing|upgrade|pricing|credits?|referrals?|invite|teams?)(?:$|[^a-z])",
+                r"(?i)(?:^|[^a-z])(code[_ -]view|new[_ -]file|save[_ -]file|open[_ -]repository|global[_ -]search|code[_ -]as[_ -]default[_ -]editor|conversations?|cli[_ -]responses|go[_ -]to[_ -]line|left[_ -]panel|help|blog|docs|learn[_ -]more|more[_ -]info|open[_ -]in[_ -]warp|workflows?|vim|markdown|bookmarks?|sticky|compact mode|changelog|feedback|slack|community|documentation|vertical[_ -]tabs|tab[_ -]groups?|pinned[_ -]tabs|command[_ -]corrections|error[_ -]underlining|@.*context[_ -]menu|code[_ -]editor|code[_ -]review|project[_ -]explorer|file[_ -]editor|block[_ -]filter|filter[_ -]block|tab[_ -]configs?|launch[_ -]configurations?|tab[_ -]colou?rs?|pin[_ -]tab|ai|agents?|llm|mcp|oz|drive|notebooks?|telemetry|analytics|crash reporting|shar(?:e|ed|ing)|billing|upgrade|pricing|credits?|referrals?|invite|teams?|log[_ -]?out|sign[_ -]?up|settings[_ -]?(?:sync|account))(?:$|[^a-z])",
             ).unwrap();
             let mut leftovers = Vec::new();
             for binding in ctx.get_key_bindings() {
@@ -218,4 +218,62 @@ fn lean_disables_legacy_product_contexts() {
     ] {
         assert!(!flag.is_enabled(), "{flag:?}");
     }
+}
+
+#[test]
+fn lean_settings_never_sync_with_the_cloud() {
+    assert!(!settings::SettingsMode::Gui.should_sync_to_cloud());
+}
+
+#[test]
+fn lean_never_prompts_for_sign_in_or_logs_out() {
+    use crate::auth::auth_view_modal::AuthViewVariant;
+    use crate::{AuthManager, AuthManagerEvent};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use warpui::SingletonEntity;
+
+    App::test((), |mut app| async move {
+        app.add_singleton_model(|_ctx| crate::ServerApiProvider::new_for_test());
+        app.add_singleton_model(|_| crate::auth::AuthStateProvider::new_logged_out_for_test());
+        app.add_singleton_model(AuthManager::new_for_test);
+        let prompted = Arc::new(AtomicBool::new(false));
+        let prompted_in_listener = prompted.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&AuthManager::handle(ctx), move |_, event, _| {
+                if matches!(event, AuthManagerEvent::AttemptedLoginGatedFeature { .. }) {
+                    prompted_in_listener.store(true, Ordering::Relaxed);
+                }
+            });
+        });
+        AuthManager::handle(&app).update(&mut app, |auth_manager, ctx| {
+            auth_manager.attempt_login_gated_feature(
+                "test",
+                AuthViewVariant::RequireLoginCloseable,
+                ctx,
+            );
+            auth_manager.anonymous_user_hit_drive_object_limit(ctx);
+        });
+        assert!(!prompted.load(Ordering::Relaxed));
+        app.update(|ctx| {
+            // Logging out deletes the local database; neither entry point may reach it.
+            crate::auth::maybe_log_out(ctx);
+            crate::auth::log_out(ctx);
+        });
+    });
+}
+
+#[test]
+fn lean_http_clients_fail_without_opening_a_connection() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let url = format!("http://localhost:{}/", listener.local_addr().unwrap().port());
+    let result = futures::executor::block_on(
+        http_client::Client::new()
+            .get(url)
+            .timeout(std::time::Duration::from_secs(3))
+            .send(),
+    );
+    assert!(result.is_err());
+    assert!(listener.accept().is_err(), "a connection reached the loopback listener");
 }

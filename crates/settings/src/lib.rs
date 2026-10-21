@@ -195,7 +195,7 @@ impl SettingsMode {
     /// clobber shared cloud state.
     pub fn should_sync_to_cloud(self) -> bool {
         match self {
-            SettingsMode::Gui => true,
+            SettingsMode::Gui => !warpui_core::lean::IS_LEAN,
             SettingsMode::Tui => false,
         }
     }

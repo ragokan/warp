@@ -733,7 +733,7 @@ impl AuthManager {
         auth_view_variant: AuthViewVariant,
         ctx: &mut ModelContext<Self>,
     ) {
-        if self.auth_state.is_anonymous_or_logged_out() {
+        if self.auth_state.is_anonymous_or_logged_out() && !cfg!(feature = "lean") {
             send_telemetry_from_ctx!(
                 TelemetryEvent::AnonymousUserAttemptLoginGatedFeature { feature },
                 ctx
@@ -743,7 +743,7 @@ impl AuthManager {
     }
 
     pub fn anonymous_user_hit_drive_object_limit(&self, ctx: &mut ModelContext<Self>) {
-        if self.auth_state.is_anonymous_or_logged_out() {
+        if self.auth_state.is_anonymous_or_logged_out() && !cfg!(feature = "lean") {
             send_telemetry_from_ctx!(TelemetryEvent::AnonymousUserHitCloudObjectLimit, ctx);
             ctx.emit(AuthManagerEvent::AttemptedLoginGatedFeature {
                 auth_view_variant: AuthViewVariant::HitDriveObjectLimitCloseable,
