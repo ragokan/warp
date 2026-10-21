@@ -1,0 +1,38 @@
+{
+  "checked_at_utc": "2026-10-20T23:24:31.389350+00:00",
+  "source_commit": "dd68ee356",
+  "binary_pids": [
+    452506,
+    452512
+  ],
+  "stable_pids": [],
+  "tcp_listeners": 0,
+  "oz_remote_daemon_pids": [],
+  "final_build_log_lines": 755,
+  "log_sources": [
+    {
+      "file": "warp-oss.log.old.1",
+      "lines": 106
+    },
+    {
+      "file": "warp-oss.log.old.0",
+      "lines": 319
+    },
+    {
+      "file": "warp-oss.log",
+      "lines": 330
+    }
+  ],
+  "activity_mentions": {
+    "Factory MCP": 0,
+    "MCP work": 0,
+    "ONNX/classifier": 0,
+    "remote server": 0,
+    "autoupdate": 0,
+    "changelog": 0,
+    "local HTTP": 0
+  },
+  "stable_files_checked": 9,
+  "stable_files_changed": 0,
+  "raw_logs_and_socket_output": "/tmp/warp-lean-evidence/"
+}

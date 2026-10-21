@@ -1,0 +1,32 @@
+{
+  "inspection": "Cua visual only; unchanged split width; vertical scrolling; no clipboard",
+  "idle_seconds_before_viewer": 314,
+  "operation_suffix_note": "GetWorkspacesMetadataForUser clipped visually; uniquely matched the visible query prefix to the existing source operation",
+  "methods": "clipped at approved pane width; not transcribed",
+  "tcp_peer": "34.117.41.85:443",
+  "reverse_dns_host": "85.41.117.34.bc.googleusercontent.com",
+  "host_limit": "PTR is infrastructure, not proof of the TLS virtual host; closed short-lived sockets are absent from this snapshot",
+  "finding": "UserGithubInfo cloud-environment discovery fixed by shared lean fetch guard; real Cargo assertion red/green passed",
+  "screenshots": "/tmp/warp-lean-evidence/review-network-*.png; no full token visible",
+  "pre_fix_operationNames": [
+    "GetUser",
+    "GetUserSettings",
+    "GetUpdatedCloudObjects",
+    "GetWorkspacesMetadataForUser",
+    "GetReferralInfo",
+    "UserGithubInfo"
+  ],
+  "final_binary_sha256": "ec5f52121ae8096cdf52c64fc495ef55607dd046227f03555e6a4886b6428fac",
+  "final_spot_check": {
+    "inspection": "One Cua vertical batch, unchanged split width; viewer find unavailable; no clipboard",
+    "settings_open_entry_utc": "2026-10-21 01:39:24",
+    "next_entry_utc": "2026-10-21 01:40:42",
+    "operationNames": [
+      "GetWorkspacesMetadataForUser"
+    ],
+    "UserGithubInfo_observed": false,
+    "screenshots": "/tmp/warp-lean-evidence/review-netfix-walk-58.png through review-netfix-walk-60.png",
+    "scope": "Bounded Settings-open entries; unit regression is the primary proof, no second full five-minute inspection"
+  },
+  "final_socket_peer": "34.117.41.85:443"
+}

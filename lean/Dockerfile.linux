@@ -1,0 +1,13 @@
+# Builder for the lean Linux build. Debian 13 to match the target host's glibc.
+FROM debian:trixie
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates curl git build-essential cmake pkg-config python3 unzip \
+      libssl-dev libfreetype-dev libexpat1-dev libgit2-dev libfontconfig1-dev \
+      libclang-dev protobuf-compiler libprotobuf-dev libxkbcommon-dev libwayland-dev libxcb1-dev \
+    && rm -rf /var/lib/apt/lists/*
+ARG UID=1000
+RUN useradd -m -u ${UID} builder
+USER builder
+ENV PATH=/home/builder/.cargo/bin:$PATH
+RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.92.0
+WORKDIR /work

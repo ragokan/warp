@@ -1,0 +1,23 @@
+{
+  "checked_at_utc": "2026-10-21T01:46:49.253278+00:00",
+  "binary_sha256": "ec5f52121ae8096cdf52c64fc495ef55607dd046227f03555e6a4886b6428fac",
+  "binary_pids": [
+    747892,
+    747899
+  ],
+  "stable_pids": [],
+  "tcp_listeners": 0,
+  "oz_remote_daemon_pids": [],
+  "log_lines_scanned": 571,
+  "activity_mentions": {
+    "Factory MCP": 0,
+    "MCP work": 0,
+    "ONNX/classifier": 0,
+    "remote server": 0,
+    "autoupdate": 0,
+    "changelog": 0,
+    "local HTTP": 0
+  },
+  "stable_files_checked": 9,
+  "stable_files_changed": 0
+}

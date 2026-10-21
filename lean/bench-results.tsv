@@ -1,0 +1,10 @@
+time	label	secs	cpu_pct_avg	cpu_sec	rss_mb	pss_mb	peak_rss_mb	threads	procs
+21:16:08	stable-idle-1tab	60	0.62	0.62	583	517	583	134	2
+21:16:56	stable-burst-seq300k	25	9.41	4.02	585	519	585	134	2
+21:18:37	stable-idle-5tabs	40	1.54	1.02	607	539	607	138	2
+23:09:57	lean-idle-1tab	60	0.35	0.36	308	242	310	121	2
+23:12:12	lean-burst-seq300k	25	9.67	4.21	309	242	309	121	2
+23:14:18	lean-idle-5tabs	40	0.29	0.20	329	263	331	125	2
+23:17:45	lean-idle-1tab	60	0.35	0.36	309	243	311	121	2
+23:20:26	lean-burst-seq300k	25	9.27	4.23	310	244	310	121	2
+23:22:51	lean-idle-5tabs	40	0.30	0.21	332	265	332	125	2
