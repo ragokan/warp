@@ -38,7 +38,12 @@ class VerifyBundleTests(unittest.TestCase):
                     self.assertFalse(path.exists())
                 else:
                     self.assertEqual(result.returncode, 0, result.stderr)
-                    self.assertEqual(plistlib.loads(path.read_bytes())["CFBundleVersion"], version)
+                    plist = plistlib.loads(path.read_bytes())
+                    self.assertEqual(plist["CFBundleVersion"], version)
+                    self.assertEqual(plist["CFBundleName"], "Warper")
+                    self.assertEqual(plist["CFBundleDisplayName"], "Warper")
+                    self.assertEqual(plist["CFBundleIdentifier"], "dev.warp.WarpOss")
+                    self.assertEqual({item["NSMenuItem"]["default"] for item in plist["NSServices"]}, {"New Warper Tab Here", "New Warper Window Here"})
 
     def test_macos_package_rejects_wrong_arch_and_bundle_identifier(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -57,6 +62,8 @@ class VerifyBundleTests(unittest.TestCase):
             plugin.mkdir(parents=True)
             (plugin / "WarpDockTilePlugin").write_bytes(b"plugin")
             plist = {
+                "CFBundleName": "Warper",
+                "CFBundleDisplayName": "Warper",
                 "CFBundleIdentifier": "dev.warp.WarpOss",
                 "CFBundleExecutable": "warp-oss",
                 "CFBundlePackageType": "APPL",
@@ -114,14 +121,14 @@ class VerifyBundleTests(unittest.TestCase):
     def test_linux_package_rejects_wrong_arch_missing_resources_and_private_libraries(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            binary = root / "warp-terminal-oss"
+            binary = root / "warper"
             header = bytearray(20)
             header[:6] = b"\x7fELF\x02\x01"
             struct.pack_into("<H", header, 18, 183)
             binary.write_bytes(header)
             binary.chmod(0o755)
             desktop = root / "dev.warp.WarpOss.desktop"
-            entry = "Exec=warp-terminal-oss %U\nIcon=dev.warp.WarpOss\nMimeType=x-scheme-handler/warposs;\n"
+            entry = "Name=Warper\nExec=warper %U\nIcon=dev.warp.WarpOss\nMimeType=x-scheme-handler/warposs;\n"
             desktop.write_text(entry)
             (root / "dev.warp.WarpOss.png").write_bytes(b"icon")
             resources = root / "resources"

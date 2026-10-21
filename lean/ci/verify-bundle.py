@@ -16,6 +16,8 @@ def verify(platform, root, ldd=None):
         with (contents / "Info.plist").open("rb") as stream:
             plist = plistlib.load(stream)
         assert plist["CFBundleIdentifier"] == "dev.warp.WarpOss", plist
+        assert plist["CFBundleName"] == "Warper", plist
+        assert plist["CFBundleDisplayName"] == "Warper", plist
         assert plist["CFBundleExecutable"] == "warp-oss", plist
         assert plist["CFBundlePackageType"] == "APPL", plist
         assert re.fullmatch(r"\d+\.\d+\.\d+", plist["CFBundleVersion"]), plist
@@ -51,14 +53,15 @@ def verify(platform, root, ldd=None):
         assert (magic, cpu) == (0xFEEDFACF, 0x0100000C), "Expected arm64 Mach-O"
         print(json.dumps(plist, indent=2))
     else:
-        binary = root / "warp-terminal-oss"
+        binary = root / "warper"
         resources = root / "resources"
         with binary.open("rb") as stream:
             header = stream.read(20)
         assert header[:6] == b"\x7fELF\x02\x01", "Expected little-endian ELF64"
         assert struct.unpack_from("<H", header, 18)[0] == 183, "Expected ELF aarch64"
         desktop = (root / "dev.warp.WarpOss.desktop").read_text()
-        assert "Exec=warp-terminal-oss %U" in desktop
+        assert "Exec=warper %U" in desktop
+        assert "Name=Warper" in desktop
         assert "Icon=dev.warp.WarpOss" in desktop
         mime_types = re.search(r"^MimeType=(.*)$", desktop, re.MULTILINE)
         assert mime_types and "x-scheme-handler/warposs" in mime_types[1].split(";"), (

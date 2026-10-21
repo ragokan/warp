@@ -7,7 +7,7 @@ mkdir -p "$output"
 output="$(cd "$output" && pwd)"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
-app="$stage/WarpOss.app"
+app="$stage/Warper.app"
 contents="$app/Contents"
 mkdir -p "$contents/MacOS" "$contents/Resources" "$contents/PlugIns"
 cp "$binary" "$contents/MacOS/warp-oss"
@@ -30,8 +30,8 @@ version = match[1] if match else "0.1.0"
 with open(sys.argv[1], "wb") as stream:
     plistlib.dump({
         "CFBundleDevelopmentRegion": "English",
-        "CFBundleName": "WarpOss",
-        "CFBundleDisplayName": "WarpOss",
+        "CFBundleName": "Warper",
+        "CFBundleDisplayName": "Warper",
         "CFBundleExecutable": "warp-oss",
         "CFBundleIdentifier": "dev.warp.WarpOss",
         "CFBundleInfoDictionaryVersion": "6.0",
@@ -47,7 +47,7 @@ with open(sys.argv[1], "wb") as stream:
         "LSBackgroundOnly": False,
         "SMAuthorizedClients": ["dev.warp.WarpOss"],
         "NSServices": [{
-            "NSMenuItem": {"default": f"New WarpOss {kind} Here"},
+            "NSMenuItem": {"default": f"New Warper {kind} Here"},
             "NSMessage": message,
             "NSRequiredContext": {"NSTextContent": "FilePath"},
             "NSSendTypes": ["NSFilenamesPboardType", "public.plain-text"],
@@ -75,15 +75,15 @@ file "$contents/MacOS/warp-oss"
 otool -L "$contents/MacOS/warp-oss"
 python3 lean/ci/verify-bundle.py macos "$app"
 
-ditto -c -k --keepParent "$app" "$output/lean-warp-macos-arm64.zip"
+ditto -c -k --keepParent "$app" "$output/warper-macos-arm64.zip"
 extracted="$stage/extracted"
 mkdir "$extracted"
-ditto -x -k "$output/lean-warp-macos-arm64.zip" "$extracted"
-python3 lean/ci/verify-bundle.py macos "$extracted/WarpOss.app"
-codesign --verify --deep --strict --verbose=2 "$extracted/WarpOss.app"
+ditto -x -k "$output/warper-macos-arm64.zip" "$extracted"
+python3 lean/ci/verify-bundle.py macos "$extracted/Warper.app"
+codesign --verify --deep --strict --verbose=2 "$extracted/Warper.app"
 disk="$stage/disk"
 mkdir "$disk"
-ditto "$app" "$disk/WarpOss.app"
+ditto "$app" "$disk/Warper.app"
 ln -s /Applications "$disk/Applications"
-hdiutil create -volname WarpOss -srcfolder "$disk" -ov -format UDZO \
-  "$output/lean-warp-macos-arm64.dmg"
+hdiutil create -volname Warper -srcfolder "$disk" -ov -format UDZO \
+  "$output/warper-macos-arm64.dmg"

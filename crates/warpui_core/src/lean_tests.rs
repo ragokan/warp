@@ -55,3 +55,15 @@ fn lean_surface_and_setting_policy_preserves_terminal_preferences() {
     assert!(link_is_allowed("https://docs.warp.dev/privacy"));
     assert!(link_is_allowed("https://app.warp.dev/account"));
 }
+
+#[test]
+fn display_name_preserves_upstream_outside_lean() {
+    assert_eq!(
+        app_name(),
+        if cfg!(feature = "lean") {
+            "Warper"
+        } else {
+            "Warp"
+        }
+    );
+}

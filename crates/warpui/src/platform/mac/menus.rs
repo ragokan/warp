@@ -164,7 +164,7 @@ unsafe extern "C" {
 
 struct StandardMenuItemProperties {
     /// The menu item title.
-    title: &'static NSString,
+    title: KeyEquivalent,
     /// The selector to invoke.
     action: Sel,
     /// The key equivalent string, or empty for none.
@@ -200,14 +200,14 @@ fn resolve_standard_action(action: StandardAction) -> StandardMenuItemProperties
         shortcut: &'static NSString,
     ) -> StandardMenuItemProperties {
         StandardMenuItemProperties {
-            title,
+            title: KeyEquivalent::Static(title),
             action,
             shortcut,
             modifiers,
         }
     }
 
-    match action {
+    let mut properties = match action {
         StandardAction::Close => make(
             ns_string!("Close Window"),
             sel!(performClose:),
@@ -253,7 +253,19 @@ fn resolve_standard_action(action: StandardAction) -> StandardMenuItemProperties
             ns_string!("f"),
         ),
         StandardAction::Paste => make(ns_string!("Paste"), sel!(paste:), none, ns_string!("")),
+    };
+    if crate::lean::IS_LEAN && matches!(action, StandardAction::Quit | StandardAction::Hide) {
+        let verb = if action == StandardAction::Quit {
+            "Quit"
+        } else {
+            "Hide"
+        };
+        properties.title = KeyEquivalent::Dynamic(NSString::from_str(&format!(
+            "{verb} {}",
+            crate::lean::app_name()
+        )));
     }
+    properties
 }
 
 /// Determine the key equivalent for the given keystroke
@@ -356,7 +368,7 @@ unsafe fn make_menu_item(menu_item: MenuItem) -> id {
                 let properties = resolve_standard_action(standard_action);
                 let nsmenu_item = NSMenuItem::initWithTitle_action_keyEquivalent(
                     mtm.alloc(),
-                    properties.title,
+                    properties.title.as_nsstring(),
                     Some(properties.action),
                     properties.shortcut,
                 );

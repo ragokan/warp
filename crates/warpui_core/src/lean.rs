@@ -2,6 +2,13 @@
 
 pub const IS_LEAN: bool = cfg!(feature = "lean");
 
+pub const fn app_name() -> &'static str {
+    if cfg!(feature = "lean") {
+        "Warper"
+    } else {
+        "Warp"
+    }
+}
 
 pub fn surface_is_allowed(name: &str, description: &str) -> bool {
     !cfg!(feature = "lean")

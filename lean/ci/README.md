@@ -29,20 +29,20 @@ sync, list all workflows and disable newly introduced upstream workflows,
 leaving **Lean release** active:
 
 ```bash
-gh workflow list --all --repo ragokan/warp
-gh workflow disable <new-workflow-id> --repo ragokan/warp
+gh workflow list --all --repo ragokan/warper
+gh workflow disable <new-workflow-id> --repo ragokan/warper
 ```
 
 ## macOS
 
-Extract `lean-warp-macos-arm64.zip`, or mount the DMG, and move `WarpOss.app` to
+Extract `warper-macos-arm64.zip`, or mount the DMG, and move `Warper.app` to
 Applications. The app is ad-hoc signed, **not notarized**. On macOS 15+, try
 opening it once, then use **System Settings → Privacy & Security → Open Anyway**
 if you trust the downloaded build. See [Apple's Gatekeeper instructions](https://support.apple.com/en-us/102445).
 Alternatively, remove its quarantine attribute:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/WarpOss.app
+xattr -dr com.apple.quarantine /Applications/Warper.app
 ```
 
 CI checks the bundle plist, URL scheme, document types, usage descriptions,
@@ -54,28 +54,28 @@ Packaging checks do not establish successful GUI startup on a real Mac.
 
 ## Linux
 
-Extract `lean-warp-linux-arm64.tar.gz`. For a portable run, keep the entire
-extracted directory together and run `./warp-terminal-oss` there.
+Extract `warper-linux-arm64.tar.gz`. For a portable run, keep the entire
+extracted directory together and run `./warper` there.
 
 For installation, use the checkout's existing [`lean/install-linux.sh`](../install-linux.sh)
 with the extracted binary, then copy the packaged resources alongside the real
 installed binary. From the repository root, with default XDG paths:
 
 ```bash
-package=/absolute/path/to/lean-warp-linux-arm64
-bash lean/install-linux.sh "$package/warp-terminal-oss"
+package=/absolute/path/to/warper-linux-arm64
+bash lean/install-linux.sh "$package/warper"
 cp -R "$package/resources/." "$HOME/.local/lib/warp-lean/resources/"
 update-desktop-database "$HOME/.local/share/applications"
 xdg-mime default dev.warp.WarpOss.desktop x-scheme-handler/warposs
 ```
 
 The installer places the real binary at `~/.local/lib/warp-lean/warp-oss` and
-creates a `~/.local/bin/warp-lean` **symlink**. Keep `resources/` next to that real
+creates a `~/.local/bin/warper` **symlink**. Keep `resources/` next to that real
 binary; do not copy only the binary onto PATH. Ensure `~/.local/bin` is on PATH
 for shell use. The installer writes a desktop entry with an **absolute Exec
 path**, so desktop launch and login callbacks work independently of the GUI
 session's PATH. The portable archive's reference desktop entry keeps the bare
-`warp-terminal-oss` name for relocatable installations; use the installer's
+`warper` name for relocatable installations; use the installer's
 generated desktop entry for this installation. The database refresh and
 `warposs` MIME registration above enable the login callback. If you customize
 `LEAN_INSTALL_PREFIX` or XDG directories, use the matching paths.
@@ -94,6 +94,6 @@ for script in lean/ci/bundle-macos.sh lean/ci/bundle-linux.sh; do
   bash -n "$script"
 done
 python3 -m unittest discover -s lean/ci -p '*_tests.py'
-python3 lean/ci/verify-bundle.py macos /path/to/WarpOss.app
-python3 lean/ci/verify-bundle.py linux /path/to/lean-warp-linux-arm64
+python3 lean/ci/verify-bundle.py macos /path/to/Warper.app
+python3 lean/ci/verify-bundle.py linux /path/to/warper-linux-arm64
 ```

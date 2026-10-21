@@ -1,5 +1,57 @@
 # Lean build progress
 
+## 2026-10-21 — product removal, poll-only sync and Warper
+
+- Four authorized areas: remaining AI/Drive/MCP/telemetry surfaces; selected optional
+  terminal/editor features; poll-only settings sync; display/package rename to Warper.
+  No dependencies, pushes, tags, stable-directory writes or committed screenshots.
+- Central binding/menu/slash/widget/schema policies hide the removed areas. Deleted seven
+  compile-feature entries and corresponding runtime allowlist entries. Effective getters
+  disable behavior without changing stored values. File links keep external opening.
+- Hidden preferences are excluded from registration, cloud uploads and duplicate cleanup;
+  the TOML backend inhibits their writes/removals while retaining the full document.
+  The legacy privacy fetch/migration is disabled after retaining secret-regex initialization.
+  notifications.preferences remains a compound preservation exception; its agent UI is hidden.
+- Red/green: registered-surface enumeration, orphan-action policy and legacy privacy
+  migration each failed an assertion before its fix. Evidence stays private under
+  /tmp/warp-lean-evidence/removal/; no source-extraction harness is committed.
+- All original syncer helpers and test bodies are unchanged. Eleven migration-specific
+  tests are excluded only under lean. Isolated c13 baseline: 16 passed, duplicate cleanup
+  alone failed (4 expected operations vs 3; lean already skips agent timestamps).
+  Ten exclusions follow this round's intentional legacy privacy migration/GetUserSettings removal.
+- New lean tests cover hidden-key preservation, local upload, cloud application and no
+  equal-value re-upload. Diagnostic actual queue was empty; its historical future vector
+  was not. The final test uses upstream's unchanged-request-count assertion plus queue/revision checks.
+- Frozen final source: 59 Rust hashes. Docker lean fast checks passed, full syncer module
+  8 passed, selected modules/shared crates 304 additional executions passed, release build
+  via lean/build.sh passed in 8m11s.
+  Final default-feature app/shared checks pass; 124 tests pass (syncer17/privacy1/AI34/URI72),
+  with all upstream syncer helpers and assertions unchanged.
+- Non-mutating rustfmt reports six deferred statements: five span upstream lines; the
+  lean-only URI expression is deferred by the explicit source-freeze instruction. No
+  upstream reformatting was retained. Eight earlier strict-Clippy diagnostics are unchanged master lines.
+- Cua final target binary and portable warper executable launched with the same OSS identity.
+  Login persists, sync On untoggled, Monokai Pro Spectrum/SFMono Nerd Font17/110% unchanged.
+  Full Appearance/Features/shortcuts scrolls, 19 palette queries and +/tab/block menus pass.
+  Network-log content renders; its temporary screenshot was deleted. Generic input folding stays.
+- Settled-pointer Ctrl-clicks on .html/.md/.rs all reached the temporary xdg-open probe.
+  Initial clicks preceded link highlighting; no code fix was needed. Probe instance closed;
+  the portable build runs with normal PATH. No Chromium window was closed or killed.
+- Real TOML SHA and nanosecond mtime are identical after launch and harmless resize.
+  toml_edit 0.25.6 supports this TOML 1.1 file; zero parse errors, startup preference load
+  completion observed. All nine stable file hashes remain identical.
+- Linux bundle fixture tests and actual ELF/resource/schema verifier pass. Embedded macOS
+  plist differs only in the two display names; native macOS runtime remains unverified.
+- Idle socket check after 217 seconds: both portable-build PIDs have zero TCP connections
+  and zero listeners. Installed hash 5d955be2075bf75d95f632de97462636597aeb11c72bafa81f55dfe6b796b291
+  matches the checked target. Old hash ec5f5212 is preserved as warp-oss.lean-v0.1.0.
+- Cua confirms the installed launcher/window name Warper, same login and sync On, shell seq
+  output, normal PATH and unchanged OSS identity. Installed PID1351346 is left running.
+  Real settings SHA/mtime and nine stable hashes still match after installation.
+- Four local area commits follow this record. Exact commands, results, screenshot paths,
+  individual test-exclusion reasons and per-commit LoC are in the private removal/REPORT.md.
+  No native macOS check, cross-device preference mutation or new performance benchmark.
+
 ## 2026-10-20 — baseline preserved
 
 - Branch `lean` started at upstream/master `831f4fa9f`; master is untouched.
@@ -418,3 +470,34 @@ then tag lean-pre-squash and rewrite to two area commits; verify identical tagge
   no PNG/log/harness/workflow changes and master still equal to upstream at 831f4fa9fa.
   To preserve that identical-tree check, post-rewrite results/SHAs go in the completion
   message and /tmp/warp-lean-evidence/history-final.json rather than changing this snapshot.
+
+
+### Review-fix batch (2026-10-21)
+
+- Restored Input type registration/sync; hid Default session mode; file resolution now changes
+  only the Warp editor choice and Markdown preference before upstream fallback selection.
+- Removed redundant poll constants/test, tab-config copying and the unneeded embedded lean
+  macOS plist. Transferred-tab titles use the shared name helper. URI/keymap lean statements
+  were formatted without moving upstream code.
+- Referral themes remain reachable when unlocked (`themes/theme_chooser.rs`), so the conditional
+  review request leaves GetReferralInfo enabled. The current theme is custom Monokai Pro Spectrum.
+- Added fresh-returning-device cloud sync coverage with unchanged upstream helpers. Build,
+  test, install/desktop and rewritten-commit verification results are recorded privately in
+  `/tmp/warp-lean-evidence/review-fixes/REPORT.md`; no screenshots or raw runtime logs are committed.
+- Final lean cycle passed: 333 test executions across overlapping filters; fresh-device
+  zero-upload test passes with cloud CustomSecretRegexList seeded from upstream defaults.
+  No production initialization or upstream test helper changed. Release build: 10m07s.
+- Installed the matching release, preserving rollback. Cua PID1477366: logged in, sync On,
+  Input type visible/Warp selected, Default session mode absent. Theme/font/zoom unchanged;
+  settings SHA/mtime and rollback hash unchanged after scrolling and resize/restore.
+- Formatting check retains four deferred upstream-spanning hunks; URI, keymap and new tests
+  are clean.
+- Final default-feature app/shared checks and all selected module tests passed on the
+  frozen source: 153 test executions, including all 17 upstream syncer tests.
+- Folded fixes into the four area commits; the saved candidate tree and all 60 frozen source
+  hashes matched afterward, with no conflict markers. The authorized CI-only fast-forward
+  triggered https://github.com/ragokan/warper/actions/runs/39628464139 at 26e3fb465.
+- Commits 1a1ad4f66, b8bbcc2d2 and 1ef77b6b1 each passed lean app/lib/tests, lean
+  warpui_core/lib/tests and default-feature app/lib compile checks (nine checks, exit 0).
+  The isolated worktree was removed and pruned; exact commands/logs are in
+  `/tmp/warp-lean-evidence/review-fixes/commit-check/`. The final doc-only amendment was not pushed.

@@ -1,8 +1,12 @@
-# Warp Lean
+# Warper
 
 A terminal-focused `warp-oss` build from branch `lean`. Account login and cloud settings sync
 remain upstream implementations. Stable Warp's files are read only and are never used as the
 OSS authentication store. `master` stays at upstream; nothing is pushed by this tooling.
+
+Display name: **Warper**; app IDs, data directories, login scheme and icons are unchanged.
+Releases use `warper-macos-arm64.zip` / `.dmg` and `warper-linux-arm64.tar.gz` (`warper` binary).
+The installer preserves `warp-oss.lean-v0.1.0` for rollback.
 
 ## Build
 
@@ -41,7 +45,7 @@ lean/install-linux.sh
 ```
 
 The installer puts the binary in `~/.local/lib/warp-lean/warp-oss`, adds
-`~/.local/bin/warp-lean`, installs the OSS icon and a desktop launcher, generates the settings
+`~/.local/bin/warper`, installs the OSS icon and a desktop launcher, generates the settings
 schema beside the executable, and registers `warposs://` for login callbacks. Terminal fonts,
 shell bootstrap and normal UI assets are embedded by the upstream release asset provider.
 No Oz skills or remote-server binaries are installed.
@@ -53,9 +57,9 @@ OSS directories follow XDG overrides, otherwise:
 - State/logs: `~/.local/state/warp-oss`
 - Cache: `~/.cache/warp-oss`
 
-Only missing `settings.toml`, `keybindings.yaml`, `themes` are copied from the
-corresponding `warp-terminal` directories. Existing OSS copies are preserved. Legacy
-`user_preferences.json` is omitted because it contains free-form saved prompts and cannot be
+The installer copies missing `settings.toml` and `keybindings.yaml` files and the `themes`
+directory from the corresponding `warp-terminal` directories. Existing OSS copies are preserved.
+Legacy `user_preferences.json` is omitted because it contains free-form saved prompts and cannot be
 established to be secret-free. No auth files, tokens, keychain entries or databases are migrated.
 Login therefore needs its own browser callback. The fixed loopback HTTP server is only for
 installation detection and profiling; authentication uses the registered URL scheme.
@@ -68,8 +72,8 @@ wake from sleep; network-online events still trigger a poll. Sync uses last-writ
 edit shortly after another device edits the same key can be overwritten at the next poll.
 Workspace/enterprise metadata refreshes only at startup or on demand.
 
-Turning Settings sync off and then on uses upstream `ForceCloudToMatchLocal`: cloud settings
-are overwritten with this lean installation's local values. The first install copied the
+Turning Settings sync off and then on uses upstream `ForceCloudToMatchLocal`: registered cloud
+settings are overwritten with this lean installation's local values; excluded keys are untouched. The first install copied the
 stable installation's settings; review local choices before toggling sync back on.
 
 Lean also hides AI/Drive/MCP/notebooks, analytics/crash-reporting actions, sharing, teams,
@@ -80,8 +84,13 @@ the TOML backend refuses their writes/deletes while preserving the loaded docume
 Lean no longer performs the legacy privacy migration or GetUserSettings, so eleven upstream
 tests are lean-excluded: ten passed at c13eb5653; duplicate-cleanup already failed there because
 it expected a fourth operation for the cloud-agent timestamp fetch that lean skips.
+Ten other upstream tests are lean-excluded: four in
+`search/slash_command_menu/static_commands/commands_tests.rs` assert removed slash commands;
+six in `util/openable_file_type_tests.rs` assert Warp editor/viewer behavior. All remain
+enabled with default features.
 `notifications.preferences` is the preservation exception: its full compound schema/value
 remains so ordinary terminal notifications still persist and sync; the agent row is hidden.
+GetReferralInfo remains enabled because the theme chooser still offers referral-unlocked themes.
 
 Also hidden: local/cloud workflows; Warp's editor/review/file tree and Markdown viewer;
 tab/launch configurations, groups/pins/colours/vertical tabs; block bookmarks/filter/sticky
@@ -100,17 +109,22 @@ Every upstream change is gated by `lean`; default upstream behavior is retained.
 | `app/Cargo.toml` | `lean` feature forwards the executor limit to `warpui_core`. |
 | `crates/warpui_core/Cargo.toml` | Adds opt-in `lean` feature. |
 | `crates/warpui_core/src/lean.rs`, `keymap.rs`, `platform/menu.rs`, `crates/warp_core/src/context_flag.rs` | Central lean surface/settings policy, binding/menu filters and disabled legacy contexts. |
+| `crates/warpui/src/platform/mac/menus.rs` | Reads the shared display-name helper for macOS app-menu labels. |
 | `crates/warpui_core/src/ui_components/link.rs` | Filters hidden help links while keeping privacy links. |
 | `crates/settings/src/registration.rs`, `crates/warpui_extras/src/user_preferences/toml_backed.rs` | Excludes hidden settings from registration and prevents writes/deletes without changing the loaded document. |
+| `app/src/root_view.rs` | Uses the display-name helper for transferred-tab window titles. |
 | `crates/warpui_core/src/async/native/executor.rs` | Caps the shared background executor at four workers. |
 | `app/src/features.rs` | Final terminal allowlist removes AI, MCP, Oz, cloud agents, sharing, recording, update, changelog and telemetry flags. Existing user-preference precedence pins exclusions off even if server experiments call `set_enabled`. Runtime feature menu is also disabled. |
 | `app/src/settings/input.rs` | Keeps input-style schema copy terminal-focused; both stored styles still persist and sync. |
 | `app/src/settings/ai.rs` | Effective AI availability is always false, including after login; stored choices remain intact. |
-| `app/src/settings/privacy.rs` | Effective privacy snapshot refuses all telemetry and crash/AI collection without overwriting stored or synced choices. |
+| `app/src/settings/privacy.rs` | Effective collection stays off; legacy privacy fetch/migration cannot overwrite stored or synced choices. Secret-regex initialization remains. |
 | `app/src/drive/settings.rs` | Hides Drive surfaces without disabling settings sync. |
 | `app/src/lib.rs` | Keeps Linux login callback forwarding without `release_bundle`; disables loopback HTTP, outlining/index restoration, Oz/agent/remote CLI modes custom AI endpoint initialization and AWS AI-credential subscriptions. Normal terminal-server workers remain available. |
 | `app/src/server/server_api/object.rs` | Skips parsing AI/MCP/cloud-agent generic objects from the shared settings-sync response. |
 | `app/src/server/cloud_objects/update_manager.rs` | Applies only preference generic objects, rejects non-preference websocket content updates, ignores the MCP gallery, and stops cloud-agent environment timestamp fetches. Folder/account metadata and settings synchronization remain enabled. |
+| `app/src/server/cloud_objects/listener.rs`, `app/src/workspaces/update_manager.rs` | Disables the cloud-object websocket and repeat workspace-metadata poll; keeps initial/on-demand metadata fetches. |
+| `app/src/menu.rs`, `app/src/settings_view/settings_page.rs`, `app/src/settings/schema_generation.rs` | Filters menu entries, settings widgets and schema keys through the central lean policy. |
+| `app/src/util/openable_file_type.rs`, `app/src/banner/view.rs`, `app/src/tab.rs`, `app/src/tips/tip_view.rs`, `app/src/auth/*` | Uses external file openers and hides removed-feature banners, tab actions, tips and login copy. |
 | `app/src/system/info.rs` | Stops five-second process-stat sampling; retains the model and initial reading for normal consumers. |
 | `app/src/ai/mcp/templatable_manager.rs` | Allows the unused legacy-conversion event only under lean, where its cloud producer is excluded. |
 | `app/src/ai/mcp/templatable_manager/native.rs` | Skips the cloud subscription that can migrate/delete MCP objects, restore/migration, built-in Factory MCP and every actual MCP spawn, including explicit spawn requests. |
@@ -124,7 +138,7 @@ Every upstream change is gated by `lean`; default upstream behavior is retained.
 | `app/src/settings_view/mod.rs` | Constructs only Account, Appearance, Features, Keybindings, Privacy and About and registers only their palette actions; excluded AI/billing pages cannot start fetches. |
 | `app/src/settings_view/update_environment_form.rs` | Suppresses hidden cloud-environment GitHub discovery, including initialization and refocus triggers. |
 | `app/src/settings_view/privacy_page.rs` | Hides controls for unavailable telemetry, crash and cloud AI collection. |
-| `app/src/settings_view/appearance_page.rs` | Hides agent/notebook font, Drive and agent-tab options, including their palette toggles; keeps the Project Explorer visibility setting. |
+| `app/src/settings_view/appearance_page.rs` | Hides agent/notebook font, Drive and agent-tab options, including their palette toggles; the central widget filter also hides Project Explorer. |
 | `app/src/settings_view/main_page.rs` | Hides AI-plan upsells/referrals while retaining login, logout and settings sync. |
 | `app/src/settings_view/features_page.rs` | Hides changelog and agent notification controls; retains command notifications. |
 | `app/src/terminal/view/init.rs` | Disables unconditional latest-agent-message and save-to-Drive shortcut commands. |
@@ -142,7 +156,7 @@ Every upstream change is gated by `lean`; default upstream behavior is retained.
 `lean/` owns the Dockerfile, build/install/sync scripts, tooling self-check, benchmark sampler,
 results, progress log and a verification report. Screenshots are kept privately under
 `/tmp/warp-lean-evidence/`; none are committed because the account avatar is identifying.
-`.github/workflows/` belongs to the separate CI worktree and is not changed here.
+The release workflow changes only artifact names for Warper.
 
 The runtime allowlist also disables some non-AI, non-Drive release/experiment flags:
 
@@ -150,7 +164,7 @@ The runtime allowlist also disables some non-AI, non-Drive release/experiment fl
 - `GlobalSearch`: no cross-file search tab in the tools panel.
 - `TabbedEditorView`: no multi-file editor tab UI; the terminal remains available.
 - `CodeFindReplace`: no code-editor or network-viewer find bar; terminal find remains available.
-- `FileTree`: no experimental file-tree surface; the Project Explorer visibility setting is retained.
+- `FileTree`: no experimental file-tree surface; Project Explorer is hidden by the lean widget/getter policy.
 - `SelectablePrompt`: the experimental selectable command-prompt path stays off.
 - `VideoRecording` / `WindowsVideoRecording`: no built-in video recording.
 
@@ -176,9 +190,8 @@ exercise upstream sync and conflict handling. It does
 not replace the release build or the real desktop checks. Actual run results and gaps are in
 `PROGRESS.md` and the final verification report.
 
-Use Cua Driver for all launch/input/screenshots. Keep non-Warp screenshots in
-`/tmp/warp-lean-evidence/`, and review Warp screenshots for emails/tokens before committing them
-under `lean/evidence/`. Stable Warp must be closed and no build may be running during benchmarks.
+Use Cua Driver for all launch/input/screenshots. Keep screenshots privately under
+`/tmp/warp-lean-evidence/`; never commit screenshots. Stable Warp must be closed and no build may be running during benchmarks.
 Use the copied settings, matching font, zoom and default 1280x800 window. For **each** run:
 
 1. Launch and settle about 20 seconds. Click window-local `(640,760)` with foreground delivery.

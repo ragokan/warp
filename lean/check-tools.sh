@@ -51,6 +51,14 @@ printf 'keep\n' > "$work/config/warp-oss/settings.toml"
 "$repo/lean/install-linux.sh" "$work/fake-warp" >/dev/null
 [[ $(cat "$work/config/warp-oss/settings.toml") == keep ]]
 rg -q 'x-scheme-handler/warposs' "$work/data/applications/dev.warp.WarpOss.desktop"
+rg -q '^Name=Warper$' "$work/data/applications/dev.warp.WarpOss.desktop"
+[[ -L $work/prefix/bin/warper && -f $work/prefix/lib/warp-lean/warp-oss.lean-v0.1.0 ]]
+ln -s "$work/prefix/lib/warp-lean/warp-oss" "$work/prefix/bin/warp-lean"
+"$repo/lean/install-linux.sh" "$work/fake-warp" >/dev/null
+[[ ! -L $work/prefix/bin/warp-lean ]]
+ln -s "$work/fake-warp" "$work/prefix/bin/warp-lean"
+"$repo/lean/install-linux.sh" "$work/fake-warp" >/dev/null
+[[ -L $work/prefix/bin/warp-lean ]]
 git init -q -b master "$work/upstream"
 git -C "$work/upstream" -c user.name=Check -c user.email=check@example.invalid commit -qm initial --allow-empty
 git clone -q "$work/upstream" "$work/fork"
