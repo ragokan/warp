@@ -624,7 +624,12 @@ lazy_static! {
 pub const AI_CONTROL_PANEL_MARGIN: f32 = 10.;
 
 pub const OVERFLOW_BUTTON_OFFSET_X: f32 = -3.;
-pub const MAX_WAKEUPS_PER_SECOND: u64 = 60;
+// Linux lean targets software rendering; GPU platforms keep 60 wakeups per second.
+pub const MAX_WAKEUPS_PER_SECOND: u64 = if cfg!(all(feature = "lean", target_os = "linux")) {
+    30
+} else {
+    60
+};
 pub const WAKEUP_THROTTLE_PERIOD: Duration =
     Duration::from_micros(1000 * 1000 / MAX_WAKEUPS_PER_SECOND);
 

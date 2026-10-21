@@ -1312,6 +1312,9 @@ impl UseAgentToolbar {
     }
 
     pub(in crate::terminal) fn notify_and_notify_children(&mut self, ctx: &mut ViewContext<Self>) {
+        if cfg!(feature = "lean") {
+            return;
+        }
         ctx.notify();
         self.agent_input_footer.update(ctx, |_, ctx| ctx.notify());
         self.warpify_footer_view.update(ctx, |_, ctx| ctx.notify());

@@ -143,14 +143,15 @@ Every upstream change is gated by `lean`; default upstream behavior is retained.
 | `app/src/settings_view/features_page.rs` | Hides changelog and agent notification controls; retains command notifications. |
 | `app/src/terminal/view/init.rs` | Disables unconditional latest-agent-message and save-to-Drive shortcut commands. |
 | `app/src/terminal/buy_credits_banner.rs` | Hides the AI-credit purchase banner, including the logged-in zero-credit state. |
-| `app/src/terminal/view/use_agent_footer/mod.rs` | No third-party CLI-agent detection/footer; rich input is separately flag-disabled. |
+| `app/src/terminal/view/use_agent_footer/mod.rs` | No third-party CLI-agent detection/footer or hidden-child wakeup notifications; rich input is separately flag-disabled. |
 | `app/src/workspace/mod.rs` | Disables hidden settings/Drive search shortcuts and macOS Oz install actions. |
 | `app/src/terminal/universal_developer_input.rs` | Hides the AI mode/context/model toolbar while keeping the normal command editor and saved input style. |
 | `app/src/workspace/view.rs` | Hides and disables the legacy AI assistant fallback and removes changelog/billing/referral menu entries. |
 | `app/src/uri/mod.rs` | Ignores AI, cloud-agent, MCP, Drive and shared-session deep links; keeps auth and normal terminal URLs. |
 | `app/src/changelog_model.rs` | Rejects every changelog request, including explicit actions. |
 | `app/src/app_services/linux/mod.rs` | Enables existing single-instance URL forwarding for lean Linux login callbacks. |
-| `app/src/terminal/view.rs` | Drops intercepted `warp://cli-agent` OSC 777 payloads without registering listeners. |
+| `app/src/terminal/view.rs` | Drops intercepted `warp://cli-agent` OSC 777 payloads without registering listeners. Lean Linux caps terminal wakeups at 30/s for software rendering; other builds keep 60/s. |
+| `app/src/terminal/alt_screen/alt_screen_element.rs` | Lean skips background-color sampling for its hidden footer consumers. |
 | `app/src/features_lean_tests.rs`, `app/src/lib_tests.rs`, `app/src/settings/{ai,privacy}_tests.rs`, `app/src/uri/uri_tests.rs`, `app/src/settings_view/update_environment_form_tests.rs` | Policy, startup, privacy and hidden network-fetch regression checks. |
 
 `lean/` owns the Dockerfile, build/install/sync scripts, tooling self-check, benchmark sampler,

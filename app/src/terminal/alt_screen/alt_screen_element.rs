@@ -754,7 +754,7 @@ impl Element for AltScreenElement {
             cursor_visible.then(|| model.alt_screen().cursor_style().shape),
             RespectDisplayedOutput::Yes,
             &model.image_id_to_metadata,
-            Some(&mut sampler),
+            (!cfg!(feature = "lean")).then_some(&mut *sampler),
             self.grid_render_params.hide_cursor_cell,
             ctx,
             app,
