@@ -1,6 +1,10 @@
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+
 use pathfinder_geometry::vector::vec2f;
 use warp_core::ui::external_product_icon::ExternalProductIcon;
 use warp_core::ui::icons::Icon;
+use warpui::assets::asset_cache::AssetSource;
 use warpui::elements::{
     self, Align, Border, CacheOption, ChildAnchor, ConstrainedBox, Container, Element, Image,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Stack, Text,
@@ -24,6 +28,34 @@ pub enum AvatarContent {
         /// The first initial is rendered prior to loading the image.
         display_name: String,
     },
+
+    /// Renders an image file from the local filesystem, or `fallback` while it loads or if it
+    /// cannot be decoded.
+    LocalFile {
+        path: PathBuf,
+        fallback: Icon,
+    },
+}
+
+/// Names tried, in order, when looking for the user's avatar image.
+const AVATAR_FILE_NAMES: [&str; 3] = ["avatar.png", "avatar.jpg", "avatar.jpeg"];
+
+/// Returns the first avatar image that exists in `config_dir`.
+fn find_avatar_file(config_dir: &Path) -> Option<PathBuf> {
+    AVATAR_FILE_NAMES
+        .iter()
+        .map(|name| config_dir.join(name))
+        .find(|path| path.is_file())
+}
+
+/// The user's avatar image from the config directory, looked up once per run.
+///
+/// shortcut: a replaced image is only picked up after a restart.
+pub fn configured_avatar_file() -> Option<&'static Path> {
+    static AVATAR_FILE: OnceLock<Option<PathBuf>> = OnceLock::new();
+    AVATAR_FILE
+        .get_or_init(|| find_avatar_file(&warp_core::paths::config_local_dir()))
+        .as_deref()
 }
 
 #[derive(Clone)]
@@ -54,6 +86,27 @@ impl UiComponent for Avatar {
                     .before_load(
                         Align::new(Self::first_initial(&display_name, self.styles)).finish(),
                     );
+                if let Some(radius) = styles.border_radius {
+                    image = image.with_corner_radius(radius);
+                }
+                image.finish()
+            }
+            AvatarContent::LocalFile { path, fallback } => {
+                let placeholder = || {
+                    Avatar::new(AvatarContent::Icon(fallback), styles)
+                        .build()
+                        .finish()
+                };
+                let mut image = Image::new(
+                    AssetSource::LocalFile {
+                        path: path.to_string_lossy().into_owned(),
+                        content_version: None,
+                    },
+                    CacheOption::BySize,
+                )
+                .cover()
+                .before_load(placeholder())
+                .on_load_failure(placeholder());
                 if let Some(radius) = styles.border_radius {
                     image = image.with_corner_radius(radius);
                 }
@@ -252,3 +305,7 @@ impl Avatar {
         stack.finish()
     }
 }
+
+#[cfg(test)]
+#[path = "avatar_tests.rs"]
+mod tests;

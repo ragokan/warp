@@ -1,5 +1,17 @@
 # Lean build progress
 
+## 2026-10-21 — avatar from the config directory
+
+- The avatar button shows `avatar.png`, `avatar.jpg` or `avatar.jpeg` from the config directory
+  (first match, resolved once per run); the gear icon remains the placeholder while loading and
+  the fallback when the file is missing or undecodable. A new `AvatarContent::LocalFile` variant
+  reuses the upstream `Image` element with `AssetSource::LocalFile`; no asset ships and no
+  dependency was added.
+- Tested: two unit tests for the file-name precedence (red without the lookup, green with it);
+  full lean `warp --lib` suite shows no failure beyond the 355 at baseline 9ff726424. Default-
+  feature `cargo check -p warp --lib` passes.
+- Unverified here: the real desktop rendering (circle crop, placeholder, undecodable file).
+
 ## 2026-10-21 — fully offline
 
 - Warper no longer signs in or syncs. One lean gate registers the existing "unavailable" secure

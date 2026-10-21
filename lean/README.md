@@ -119,6 +119,14 @@ links use the selected external editor, `$EDITOR`, or the system default. Plain 
 blocks, Find, copy and syntax highlighting remain. The “Show Warp network log” binding
 (`input:insert_network_logging_workflow`) is hidden with Workflows; the Privacy-page viewer stays.
 
+## Avatar
+
+The round button at the top right opens the avatar menu. It shows `avatar.png`, falling back to
+`avatar.jpg` and then `avatar.jpeg`, from the config directory that holds `settings.toml`
+(`~/.config/warp-oss` on Linux, `~/.warp-oss` on macOS). Without one, or if the file cannot be
+decoded, it shows the built-in gear icon. The image is looked up once per run and cropped to a
+circle; restart Warper after replacing it. No image ships with Warper.
+
 ## Patches
 
 The terminal-focused removals are gated by `lean`. The behavior-preserving performance
@@ -141,6 +149,7 @@ fixes listed below also apply to default builds.
 | `app/src/settings/privacy.rs` | Effective collection stays off; legacy privacy fetch/migration cannot overwrite stored or synced choices. Secret-regex initialization remains. |
 | `app/src/drive/settings.rs` | Hides Drive surfaces without disabling settings sync. |
 | `app/src/lib.rs` | Never uses the platform keychain (the existing "unavailable" secure storage), so the app is always signed out; disables loopback HTTP, outlining/index restoration, Oz/agent/remote CLI modes custom AI endpoint initialization and AWS AI-credential subscriptions. Normal terminal-server workers remain available. |
+| `app/src/ui_components/avatar.rs`, `app/src/workspace/view.rs` | The avatar button shows the user's `avatar.png`/`.jpg`/`.jpeg` from the config directory, with the gear icon as fallback. |
 | `crates/settings/src/lib.rs` | GUI settings never sync to the cloud: the syncer runs in the same inert mode as the TUI's. |
 | `app/src/server/cloud_objects/listener.rs` | Never starts the cloud-objects websocket, even with objects cached from an earlier login. |
 | `crates/http_client/src/lib.rs` | Fail-safe: every client resolves hosts through a resolver that always fails and ignores proxies, so no request can leave the machine. |
