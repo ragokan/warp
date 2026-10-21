@@ -439,6 +439,7 @@ pub enum TemplatableMCPServerManagerEvent {
     #[allow(dead_code)]
     ServerInstallationDeleted(Uuid),
     TemplatableMCPServersUpdated,
+    #[cfg_attr(feature = "lean", allow(dead_code))]
     LegacyServerConverted,
 }
 

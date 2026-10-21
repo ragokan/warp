@@ -81,7 +81,7 @@ impl ConnectedSelfHostedWorkersModel {
     }
 
     pub fn refresh(&mut self, scope: &impl TeamScope, ctx: &mut ModelContext<Self>) {
-        if !AuthStateProvider::as_ref(ctx).get().is_logged_in() {
+        if cfg!(feature = "lean") || !AuthStateProvider::as_ref(ctx).get().is_logged_in() {
             self.clear_workers(ctx);
             return;
         }

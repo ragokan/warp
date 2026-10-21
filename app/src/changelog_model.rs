@@ -38,6 +38,9 @@ impl ChangelogModel {
         request_type: ChangelogRequestType,
         ctx: &mut ModelContext<Self>,
     ) {
+        if cfg!(feature = "lean") {
+            return;
+        }
         match &self.changelog {
             ChangelogState::Some(changelog) => {
                 // Don't refetch the changelog if we already have it

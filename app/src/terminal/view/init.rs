@@ -422,6 +422,7 @@ pub fn init(app: &mut AppContext) {
             "Jump to latest agent message",
             TerminalAction::JumpToLatestAgentMessage,
         )
+        .with_enabled(|| !cfg!(feature = "lean"))
         // Available from the terminal (enters the latest conversation's agent view)
         // and from within the agent view it opens, where the rich input — not the
         // terminal — holds focus, so its context lacks `Terminal` but carries
@@ -446,6 +447,7 @@ pub fn init(app: &mut AppContext) {
             "Toggle team workflows modal",
             TerminalAction::OpenWorkflowModal,
         )
+        .with_enabled(|| !cfg!(feature = "lean"))
         .with_key_binding(cmd_or_ctrl_shift("s"))
         .with_context_predicate(
             id!("Terminal")

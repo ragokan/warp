@@ -537,7 +537,10 @@ fn orchestration_is_enabled_when_ai_is_enabled() {
         add_ai_enablement_dependencies_for_test(&mut app);
 
         AISettings::handle(&app).read(&app, |settings, ctx| {
-            assert!(settings.is_orchestration_enabled(ctx));
+            assert_eq!(
+                settings.is_orchestration_enabled(ctx),
+                !cfg!(feature = "lean")
+            );
         });
     });
 }
@@ -988,7 +991,7 @@ fn ai_autodetection_defaults_to_opt_in() {
             assert!(!*settings.ai_autodetection_enabled_internal.value());
             // AI is enabled by default, so the getter reflects the opt-in setting
             // rather than a disabled-AI state.
-            assert!(settings.is_any_ai_enabled(ctx));
+            assert_eq!(settings.is_any_ai_enabled(ctx), !cfg!(feature = "lean"));
             assert!(!settings.is_ai_autodetection_enabled(ctx));
         });
     });
@@ -1009,7 +1012,10 @@ fn ai_autodetection_setting_can_be_toggled_on_and_off() {
         });
         AISettings::handle(&app).read(&app, |settings, ctx| {
             assert!(*settings.ai_autodetection_enabled_internal.value());
-            assert!(settings.is_ai_autodetection_enabled(ctx));
+            assert_eq!(
+                settings.is_ai_autodetection_enabled(ctx),
+                !cfg!(feature = "lean")
+            );
         });
 
         // Mirrors what `/disable-natural-language-detection` does in the TUI.
@@ -1022,6 +1028,20 @@ fn ai_autodetection_setting_can_be_toggled_on_and_off() {
         AISettings::handle(&app).read(&app, |settings, ctx| {
             assert!(!*settings.ai_autodetection_enabled_internal.value());
             assert!(!settings.is_ai_autodetection_enabled(ctx));
+        });
+    });
+}
+
+#[test]
+#[cfg(feature = "lean")]
+fn lean_keeps_ai_disabled_after_login_without_changing_the_saved_choice() {
+    App::test((), |mut app| async move {
+        initialize_settings_for_tests(&mut app);
+        add_ai_enablement_dependencies_for_test(&mut app);
+        AISettings::handle(&app).read(&app, |settings, ctx| {
+            assert!(AuthStateProvider::as_ref(ctx).get().is_logged_in());
+            assert!(*settings.is_any_ai_enabled);
+            assert!(!settings.is_any_ai_enabled(ctx));
         });
     });
 }

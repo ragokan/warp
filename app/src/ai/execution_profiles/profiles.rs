@@ -255,6 +255,22 @@ pub(crate) struct SessionComputerUse {
 impl AIExecutionProfilesModel {
     #[allow(unused_variables)]
     pub(crate) fn new(launch_mode: &LaunchMode, ctx: &mut ModelContext<Self>) -> Self {
+        if cfg!(feature = "lean") {
+            return Self {
+                source: ProfileSource::for_launch_mode(launch_mode),
+                settings_migration_state: SettingsMigrationState::Complete,
+                preserve_profile_onboarding_overrides: false,
+                last_settings_profiles: ExecutionProfilesConfig::default(),
+                default_profile_state: DefaultProfileState::Cli {
+                    id: ExecutionProfileId::new(),
+                    profile: AIExecutionProfile::create_default_cli_profile(false, None),
+                },
+                profile_id_to_sync_id: HashMap::new(),
+                active_profiles_per_session: HashMap::new(),
+                session_computer_use: HashMap::new(),
+            };
+        }
+
         // Resolve the persistence backend before constructing any source-specific state.
         let source = ProfileSource::for_launch_mode(launch_mode);
         let uses_file_backed_profiles = source.is_settings_collection();

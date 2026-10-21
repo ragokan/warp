@@ -40,10 +40,13 @@ use crate::ai::mcp::{
 };
 use crate::auth::AuthStateProvider;
 use crate::auth::auth_manager::{AuthManager, AuthManagerEvent};
+#[cfg(not(feature = "lean"))]
+use crate::cloud_object::CloudObjectUuidLookup as _;
+#[cfg(not(feature = "lean"))]
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::{
     CloudObject, CloudObjectLocation, CloudObjectLookup as _, CloudObjectMetadataExt,
-    CloudObjectUuidLookup as _, GenericStringObjectFormat, JsonObjectType, Space,
+    GenericStringObjectFormat, JsonObjectType, Space,
 };
 use crate::drive::CloudObjectTypeAndId;
 use crate::persistence::{
@@ -298,7 +301,9 @@ impl TemplatableMCPServerManager {
         });
 
         // TemplatableMCPServerManager is the source of truth for templatable MCP servers stored on the cloud
+        #[cfg(not(feature = "lean"))]
         let cloud_model = CloudModel::handle(ctx);
+        #[cfg(not(feature = "lean"))]
         ctx.subscribe_to_model(&cloud_model, |me, _, event, ctx| match event {
             CloudModelEvent::ObjectUpdated {
                 type_and_id:
@@ -445,6 +450,10 @@ impl TemplatableMCPServerManager {
             server_loggers: Default::default(),
         };
 
+        if cfg!(feature = "lean") {
+            return me;
+        }
+
         me.fetch_cloud_servers(ctx);
 
         // If we're not in a test, try to load credentials from secure storage.
@@ -502,6 +511,9 @@ impl TemplatableMCPServerManager {
     }
 
     fn fetch_cloud_servers(&mut self, ctx: &mut ModelContext<Self>) {
+        if cfg!(feature = "lean") {
+            return;
+        }
         self.cloud_templatable_mcp_servers = Self::get_cloud_servers(ctx);
         self.delete_orphaned_installations(ctx);
         ctx.emit(TemplatableMCPServerManagerEvent::TemplatableMCPServersUpdated);
@@ -811,7 +823,8 @@ impl TemplatableMCPServerManager {
         let auth_state = AuthStateProvider::as_ref(ctx).get().clone();
         // Built-ins attach only in interactive clients (GUI and TUI); CLI
         // agent runs manage their MCP servers explicitly.
-        let eligible = FeatureFlag::FactoryMcp.is_enabled()
+        let eligible = !cfg!(feature = "lean")
+            && FeatureFlag::FactoryMcp.is_enabled()
             && AppExecutionMode::as_ref(ctx).can_autostart_mcp_servers()
             && !auth_state.is_anonymous_or_logged_out();
         let is_active = self.is_server_active_or_pending(installation_uuid);
@@ -911,6 +924,9 @@ impl TemplatableMCPServerManager {
         mode: SpawnMode,
         ctx: &mut ModelContext<Self>,
     ) {
+        if cfg!(feature = "lean") {
+            return;
+        }
         let installation_uuid = installation.uuid();
 
         let resolved_json = resolve_json(&installation);

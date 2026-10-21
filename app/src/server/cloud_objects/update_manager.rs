@@ -786,6 +786,18 @@ impl UpdateManager {
         force_refresh: bool,
         ctx: &mut ModelContext<UpdateManager>,
     ) {
+        #[cfg(feature = "lean")]
+        let response = {
+            let mut response = response;
+            response.updated_generic_string_objects.retain(|format, _| {
+                matches!(
+                    format,
+                    GenericStringObjectFormat::Json(JsonObjectType::Preference)
+                )
+            });
+            response.mcp_gallery.clear();
+            response
+        };
         let is_first_load = !self.has_initial_load.is_set();
         let cloud_model = CloudModel::as_ref(ctx);
         // any folder from the server will have its `is_open` model parameter set to false,
@@ -1128,6 +1140,9 @@ impl UpdateManager {
     /// Fetches environment "last used" timestamps from the server and merges them
     /// into the in-memory environment objects.
     fn fetch_and_merge_environment_timestamps(&mut self, ctx: &mut ModelContext<UpdateManager>) {
+        if cfg!(feature = "lean") {
+            return;
+        }
         let object_client = self.object_client.clone();
         let future = ctx.spawn(
             async move {
@@ -1303,6 +1318,9 @@ impl UpdateManager {
         last_editor: Option<UserProfileWithUID>,
         ctx: &mut ModelContext<UpdateManager>,
     ) {
+        if cfg!(feature = "lean") && !matches!(&cloud_object, ServerCloudObject::Preference(_)) {
+            return;
+        }
         let uid = cloud_object.uid();
 
         // Update in-memory model

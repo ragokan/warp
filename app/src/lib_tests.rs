@@ -251,3 +251,15 @@ fn launch_modes_select_expected_logging_frontend() {
         LogFrontend::Cli
     );
 }
+
+#[test]
+#[cfg(feature = "lean")]
+fn lean_gui_does_not_start_http_or_indexing() {
+    let mode = LaunchMode::App {
+        args: Default::default(),
+        api_key: None,
+    };
+    assert!(mode.is_gui());
+    assert!(!mode.should_start_local_http_server());
+    assert!(!mode.supports_indexing());
+}

@@ -303,6 +303,9 @@ impl TerminalView {
         model: &TerminalModel,
         app: &AppContext,
     ) -> bool {
+        if cfg!(feature = "lean") {
+            return false;
+        }
         let ai_settings = AISettings::as_ref(app);
 
         // If the warpify footer is active, a subshell was detected and we should show the footer.
@@ -371,6 +374,9 @@ impl TerminalView {
         model: &TerminalModel,
         ctx: &AppContext,
     ) -> Option<(CLIAgent, Option<String>)> {
+        if cfg!(feature = "lean") {
+            return None;
+        }
         let active_block = model.block_list().active_block();
 
         if !active_block.is_active_and_long_running() {

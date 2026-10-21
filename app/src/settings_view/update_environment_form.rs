@@ -1306,6 +1306,9 @@ impl UpdateEnvironmentForm {
         ctx: &mut ViewContext<Self>,
         open_auth_after_fetch: bool,
     ) {
+        if cfg!(feature = "lean") {
+            return;
+        }
         self.github_dropdown_state.is_loading = true;
         self.github_dropdown_state.load_error_message = None;
         self.github_dropdown_state.auth_url = None;

@@ -21,3 +21,17 @@ fn privacy_settings_apply_to_gui_and_tui() {
         assert!(surfaces.includes(SettingsMode::Tui), "{storage_key}");
     }
 }
+
+#[test]
+#[cfg(feature = "lean")]
+fn lean_privacy_snapshot_disables_effective_collection() {
+    let snapshot = super::PrivacySettingsSnapshot::mock();
+    assert!(snapshot.is_telemetry_enabled);
+    assert!(snapshot.is_crash_reporting_enabled);
+    assert!(snapshot.is_telemetry_force_enabled);
+    assert!(snapshot.should_disable_telemetry());
+    assert!(!snapshot.is_telemetry_enabled());
+    assert!(!snapshot.is_crash_reporting_enabled());
+    assert!(!snapshot.is_telemetry_force_enabled());
+    assert!(!snapshot.should_collect_ai_ugc_telemetry());
+}

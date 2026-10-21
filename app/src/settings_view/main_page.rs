@@ -420,7 +420,11 @@ impl AccountWidget {
                 )
                 .finish(),
             )
-            .with_child(Align::new(plan_info.finish()).right().finish())
+            .with_child(if cfg!(feature = "lean") {
+                Empty::new().finish()
+            } else {
+                Align::new(plan_info.finish()).right().finish()
+            })
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
             .finish()
     }
@@ -621,7 +625,7 @@ impl AccountWidget {
             )
             .with_cross_axis_alignment(CrossAxisAlignment::Start);
 
-        if !FeatureFlag::UsageBasedPricing.is_enabled() {
+        if !cfg!(feature = "lean") && !FeatureFlag::UsageBasedPricing.is_enabled() {
             row.add_child(Align::new(plan_info.finish()).right().finish());
         }
 
@@ -791,6 +795,9 @@ impl SettingsWidget for EarnRewardsWidget {
     }
 
     fn should_render(&self, app: &AppContext) -> bool {
+        if cfg!(feature = "lean") {
+            return false;
+        }
         !AuthStateProvider::as_ref(app)
             .get()
             .is_anonymous_or_logged_out()

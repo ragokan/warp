@@ -1308,3 +1308,21 @@ fn test_parse_docker_hub_url_trims_whitespace() {
         Some("https://hub.docker.com/r/warp/base-image".to_string())
     );
 }
+
+#[cfg(feature = "lean")]
+#[test]
+fn lean_environment_form_does_not_fetch_github_repos() {
+    App::test((), |mut app| async move {
+        init_update_environment_form_test_models(&mut app);
+        let window_id = create_test_window(&mut app);
+        app.update(|ctx| {
+            let form = ctx.add_typed_action_view(window_id, |ctx| {
+                UpdateEnvironmentForm::new_for_test(EnvironmentFormInitArgs::Create, ctx)
+            });
+            form.update(ctx, |form, ctx| {
+                form.fetch_github_repos(ctx);
+                assert!(!form.github_dropdown_state.is_loading);
+            });
+        });
+    });
+}

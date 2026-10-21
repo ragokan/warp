@@ -161,7 +161,41 @@ impl FromStr for UriHost {
 }
 
 impl UriHost {
+    #[cfg(feature = "lean")]
+    fn is_allowed_in_lean(&self, path: &str) -> bool {
+        match self {
+            Self::Auth | Self::Launch | Self::TabConfig | Self::Session => true,
+            Self::Action => matches!(
+                path,
+                "/new_tab" | "/new_window" | "/open_file_editor" | "/docker/open_subshell"
+            ),
+            Self::Settings => matches!(
+                path,
+                "" | "/"
+                    | "/account"
+                    | "/appearance"
+                    | "/features"
+                    | "/keybindings"
+                    | "/privacy"
+                    | "/about"
+            ),
+            Self::Team
+            | Self::SharedSession
+            | Self::Conversation
+            | Self::Drive
+            | Self::Home
+            | Self::Mcp
+            | Self::Codex
+            | Self::Linear
+            | Self::ChatGPTLink => false,
+        }
+    }
+
     fn handle(&self, primary_window_id: Option<WindowId>, url: &Url, ctx: &mut AppContext) {
+        #[cfg(feature = "lean")]
+        if !self.is_allowed_in_lean(url.path()) {
+            return;
+        }
         // Handle host
         match self {
             UriHost::Auth => {

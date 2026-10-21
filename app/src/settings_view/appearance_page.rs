@@ -274,6 +274,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         flags::LEFT_PANEL_VISIBILITY_ACROSS_TABS_FLAG,
     ));
 
+    #[cfg(not(feature = "lean"))]
     toggle_binding_pairs.push(ToggleSettingActionPair::new(
         "agent font matching terminal font",
         builder(SettingsAction::AppearancePageToggle(
@@ -283,6 +284,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         flags::MATCH_AI_FONT_TO_TERMINAL_FONT_FLAG,
     ));
 
+    #[cfg(not(feature = "lean"))]
     toggle_binding_pairs.push(ToggleSettingActionPair::new(
         "notebook font size matching terminal font size",
         builder(SettingsAction::AppearancePageToggle(
@@ -394,6 +396,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             context,
             flags::SHOW_VERTICAL_TAB_PANEL_IN_RESTORED_WINDOWS_FLAG,
         ));
+        #[cfg(not(feature = "lean"))]
         toggle_binding_pairs.push(ToggleSettingActionPair::new(
             "latest user prompt as conversation title in tab names",
             builder(SettingsAction::AppearancePageToggle(
@@ -1429,7 +1432,9 @@ impl AppearanceSettingsPageView {
         if cfg!(feature = "local_fs") && FeatureFlag::GlobalSearch.is_enabled() {
             tools_panel_widgets.push(Box::new(ToolsPanelGlobalSearchWidget::default()));
         }
-        tools_panel_widgets.push(Box::new(ToolsPanelWarpDriveWidget::default()));
+        if !cfg!(feature = "lean") {
+            tools_panel_widgets.push(Box::new(ToolsPanelWarpDriveWidget::default()));
+        }
         if !tools_panel_widgets.is_empty() {
             categories.push(Category::new("Tools panel", tools_panel_widgets));
         }
@@ -1463,11 +1468,12 @@ impl AppearanceSettingsPageView {
         categories.push(Category::new("Blocks", block_settings_widgets));
 
         let font_settings = FontSettings::as_ref(ctx);
-        let mut text_settings_widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![
-            Box::new(TerminalFontWidget::default()),
-            Box::new(AIFontWidget::default()),
-            Box::new(NotebookFontSizeWidget::default()),
-        ];
+        let mut text_settings_widgets: Vec<Box<dyn SettingsWidget<View = Self>>> =
+            vec![Box::new(TerminalFontWidget::default())];
+        if !cfg!(feature = "lean") {
+            text_settings_widgets.push(Box::new(AIFontWidget::default()));
+            text_settings_widgets.push(Box::new(NotebookFontSizeWidget::default()));
+        }
         if font_settings
             .use_thin_strokes
             .is_supported_on_current_platform()
@@ -1522,9 +1528,11 @@ impl AppearanceSettingsPageView {
             tab_settings_widgets.push(Box::new(
                 HideTitleBarSearchBarInVerticalTabsWidget::default(),
             ));
-            tab_settings_widgets.push(Box::new(
-                UseLatestUserPromptAsConversationTitleInTabNamesWidget::default(),
-            ));
+            if !cfg!(feature = "lean") {
+                tab_settings_widgets.push(Box::new(
+                    UseLatestUserPromptAsConversationTitleInTabNamesWidget::default(),
+                ));
+            }
             if FeatureFlag::ConfigurableToolbar.is_enabled() {
                 tab_settings_widgets.push(Box::new(EditToolbarWidget));
             }

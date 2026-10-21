@@ -184,26 +184,27 @@ impl PrivacySettingsSnapshot {
     }
 
     pub fn is_telemetry_enabled(&self) -> bool {
-        self.is_telemetry_enabled
+        !cfg!(feature = "lean") && self.is_telemetry_enabled
     }
 
     pub fn is_crash_reporting_enabled(&self) -> bool {
-        self.is_crash_reporting_enabled
+        !cfg!(feature = "lean") && self.is_crash_reporting_enabled
     }
 
     pub fn is_telemetry_force_enabled(&self) -> bool {
-        self.is_telemetry_force_enabled
+        !cfg!(feature = "lean") && self.is_telemetry_force_enabled
     }
 
     pub fn should_disable_telemetry(&self) -> bool {
         // If a user has opted in to the agent mode analytics experiment, telemetry must be enabled.
-        !self.is_telemetry_enabled
-            && !self.is_telemetry_force_enabled
-            && !FeatureFlag::AgentModeAnalytics.is_enabled()
+        cfg!(feature = "lean")
+            || (!self.is_telemetry_enabled
+                && !self.is_telemetry_force_enabled
+                && !FeatureFlag::AgentModeAnalytics.is_enabled())
     }
 
     pub fn should_collect_ai_ugc_telemetry(&self) -> bool {
-        self.should_collect_ai_ugc_telemetry
+        !cfg!(feature = "lean") && self.should_collect_ai_ugc_telemetry
     }
 
     #[cfg(test)]
@@ -682,6 +683,9 @@ impl PrivacySettings {
 
     /// Sends request(s) to update server-side user settings with current local values.
     fn update_server_with_local_settings(&self, ctx: &mut ModelContext<Self>) {
+        if cfg!(feature = "lean") {
+            return;
+        }
         if self.auth_state.is_logged_in() {
             let auth_client = self.auth_client.clone();
             let snapshot = self.get_snapshot(ctx);

@@ -25,7 +25,7 @@ pub fn teardown(ctx: &mut AppContext) {
 /// application.
 ///
 /// Returns Ok if an existing instance exists and was reachable.
-#[cfg(feature = "release_bundle")]
+#[cfg(any(feature = "release_bundle", feature = "lean"))]
 pub fn pass_startup_args_to_existing_instance(
     args: &warp_cli::AppArgs,
 ) -> Result<(), StartupArgsForwardingError> {
@@ -69,7 +69,7 @@ pub fn pass_startup_args_to_existing_instance(
 }
 
 #[derive(Debug, thiserror::Error)]
-#[cfg(feature = "release_bundle")]
+#[cfg(any(feature = "release_bundle", feature = "lean"))]
 pub enum StartupArgsForwardingError {
     /// There's no instance of Warp already running.
     #[error("no existing instance found to forward args to")]
@@ -85,7 +85,7 @@ pub enum StartupArgsForwardingError {
     Unknown(zbus::Error),
 }
 
-#[cfg(feature = "release_bundle")]
+#[cfg(any(feature = "release_bundle", feature = "lean"))]
 impl From<zbus::fdo::Error> for StartupArgsForwardingError {
     fn from(value: zbus::fdo::Error) -> Self {
         // While ServiceUnknown usually means that D-Bus doesn't know how to
@@ -100,7 +100,7 @@ impl From<zbus::fdo::Error> for StartupArgsForwardingError {
     }
 }
 
-#[cfg(feature = "release_bundle")]
+#[cfg(any(feature = "release_bundle", feature = "lean"))]
 impl From<zbus::Error> for StartupArgsForwardingError {
     fn from(value: zbus::Error) -> Self {
         match value {

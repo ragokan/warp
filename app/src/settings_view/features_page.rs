@@ -364,6 +364,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             &(context.to_owned() & id!(flags::NOTIFICATIONS_CONTEXT_FLAG)),
             flags::AGENT_TASK_COMPLETED_NOTIFICATIONS_FLAG,
         )
+        .with_enabled(|| !cfg!(feature = "lean"))
         .is_supported_on_current_platform(
             SessionSettings::as_ref(app)
                 .notifications
@@ -1391,6 +1392,7 @@ struct MouseStateHandles {
     quake_mode_width_height_reset: MouseStateHandle,
     quake_mode_pin_window_check: MouseStateHandle,
     long_running_notifications_checkbox: MouseStateHandle,
+    #[cfg(not(feature = "lean"))]
     agent_task_completed_notifications_checkbox: MouseStateHandle,
     agent_needs_attention_notifications_checkbox: MouseStateHandle,
     agent_in_app_notifications_switch: SwitchStateHandle,
@@ -2821,6 +2823,7 @@ impl FeaturesPageView {
         if changelog_settings
             .show_changelog_after_update
             .is_supported_on_current_platform()
+            && !cfg!(feature = "lean")
         {
             general_widgets.push(Box::new(ShowChangelogWidget::default()));
         }
@@ -5272,6 +5275,7 @@ impl SettingsWidget for DesktopNotificationsWidget {
             NotificationsMode::Enabled
         ) {
             let toggles = vec![
+                #[cfg(not(feature = "lean"))]
                 view.render_notification_toggle(
                     session_settings
                         .notifications
@@ -5289,7 +5293,11 @@ impl SettingsWidget for DesktopNotificationsWidget {
                 ),
                 view.render_notification_toggle(
                     session_settings.notifications.is_needs_attention_enabled,
-                    "Notify when a command or agent needs your attention to continue",
+                    if cfg!(feature = "lean") {
+                        "Notify when a command needs your attention to continue"
+                    } else {
+                        "Notify when a command or agent needs your attention to continue"
+                    },
                     FeaturesPageAction::ToggleNeedsAttentionNotifications,
                     view.button_mouse_states
                         .agent_needs_attention_notifications_checkbox

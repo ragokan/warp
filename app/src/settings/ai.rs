@@ -2268,7 +2268,8 @@ impl AISettings {
             .get()
             .is_anonymous_or_logged_out();
 
-        *self.is_any_ai_enabled
+        !cfg!(feature = "lean")
+            && *self.is_any_ai_enabled
             && !is_anonymous_or_logged_out
             && !self.is_ai_disabled_due_to_remote_session_org_policy(app)
     }

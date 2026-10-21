@@ -117,6 +117,20 @@ impl SkillWatcher {
         // Create channel for receiving repository messages (scans and updates)
         let (repository_message_tx, repository_message_rx) = async_channel::unbounded();
 
+        if cfg!(feature = "lean") {
+            return Self {
+                repository_message_tx,
+                project_skill_files_by_repo: HashMap::new(),
+                project_skill_refresh_generations: HashMap::new(),
+                next_project_skill_refresh_generation: 0,
+                failed_local_project_watchers: HashMap::new(),
+                watcher_event_tx,
+                home_provider_watchers: HashMap::new(),
+                symlink_canonical_to_originals: HashMap::new(),
+                symlink_target_watchers: HashMap::new(),
+            };
+        }
+
         // Subscribe to repository messages for both projects and home directory
         // When a message is received, handle_message is used to dispatch the message to the appropriate handler
         ctx.spawn_stream_local(

@@ -539,5 +539,70 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::CloudAgentShellRespawn,
     ]);
 
+    #[cfg(feature = "lean")]
+    for flag in enum_iterator::all::<FeatureFlag>() {
+        if !is_allowed_in_lean(flag) {
+            flags.remove(&flag);
+            // User preferences take precedence over server experiments and runtime overrides.
+            flag.set_user_preference(false);
+        }
+    }
+
     flags
 }
+
+#[cfg(feature = "lean")]
+fn is_allowed_in_lean(flag: FeatureFlag) -> bool {
+    matches!(
+        flag,
+        FeatureFlag::Ligatures
+            | FeatureFlag::RichTextMultiselect
+            | FeatureFlag::SettingsFile
+            | FeatureFlag::RectSelection
+            | FeatureFlag::ShellSelector
+            | FeatureFlag::FullScreenZenMode
+            | FeatureFlag::MinimalistUI
+            | FeatureFlag::AvatarInTabBar
+            | FeatureFlag::ImeMarkedText
+            | FeatureFlag::ValidateAutosuggestions
+            | FeatureFlag::ClearAutosuggestionOnEscape
+            | FeatureFlag::CommandCorrectionKey
+            | FeatureFlag::TabCloseButtonOnLeft
+            | FeatureFlag::UndoClosedPanes
+            | FeatureFlag::AllowOpeningFileLinksUsingEditorEnv
+            | FeatureFlag::UIZoom
+            | FeatureFlag::ClassicCompletions
+            | FeatureFlag::ForceClassicCompletions
+            | FeatureFlag::NativeShellCompletions
+            | FeatureFlag::PluggableNotifications
+            | FeatureFlag::AsyncFind
+            | FeatureFlag::NewTabStyling
+            | FeatureFlag::KittyKeyboardProtocol
+            | FeatureFlag::DirectoryTabColors
+            | FeatureFlag::VerticalTabs
+            | FeatureFlag::VerticalTabsSummaryMode
+            | FeatureFlag::TabConfigs
+            | FeatureFlag::GroupedTabs
+            | FeatureFlag::PinnedTabs
+            | FeatureFlag::SkipFirebaseAnonymousUser
+            | FeatureFlag::TrimTrailingBlankLines
+            | FeatureFlag::OscHyperlinks
+            | FeatureFlag::KittyImages
+            | FeatureFlag::ITermImages
+            | FeatureFlag::TerminalLifecycleRecovery
+            | FeatureFlag::HistorySearchRankingV2
+            | FeatureFlag::CloudObjects
+            | FeatureFlag::FetchGenericStringObjects
+            | FeatureFlag::IntegratedGPU
+            | FeatureFlag::ThinStrokes
+            | FeatureFlag::ResizeFix
+            | FeatureFlag::RemoveAutosuggestionDuringTabCompletions
+            | FeatureFlag::DragTabsToWindows
+            | FeatureFlag::BoxDrawingGlyphs
+            | FeatureFlag::MultiWorkspace
+    )
+}
+
+#[cfg(all(test, feature = "lean"))]
+#[path = "features_lean_tests.rs"]
+mod tests;

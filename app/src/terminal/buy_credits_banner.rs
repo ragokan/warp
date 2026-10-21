@@ -1003,6 +1003,9 @@ impl View for BuyCreditsBanner {
     }
 
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
+        if cfg!(feature = "lean") {
+            return warpui::elements::Empty::new().finish();
+        }
         let appearance = Appearance::as_ref(app);
         let ai_request_usage = AIRequestUsageModel::as_ref(app);
 

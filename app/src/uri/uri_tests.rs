@@ -1116,3 +1116,59 @@ fn test_decode_uuid_hex_rejects_wrong_length() {
 fn test_decode_uuid_hex_rejects_invalid_chars() {
     assert!(super::decode_uuid_hex("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ").is_none());
 }
+
+#[test]
+#[cfg(feature = "lean")]
+fn lean_uri_allowlist_keeps_auth_terminal_and_settings_routes() {
+    for (host, path) in [
+        (UriHost::Auth, "/desktop_redirect"),
+        (UriHost::Launch, "/config.yaml"),
+        (UriHost::TabConfig, "/config.yaml"),
+        (UriHost::Session, "/session-id"),
+        (UriHost::Action, "/new_tab"),
+        (UriHost::Action, "/new_window"),
+        (UriHost::Action, "/open_file_editor"),
+        (UriHost::Action, "/docker/open_subshell"),
+        (UriHost::Settings, ""),
+        (UriHost::Settings, "/"),
+        (UriHost::Settings, "/account"),
+        (UriHost::Settings, "/appearance"),
+        (UriHost::Settings, "/features"),
+        (UriHost::Settings, "/keybindings"),
+        (UriHost::Settings, "/privacy"),
+        (UriHost::Settings, "/about"),
+    ] {
+        assert!(host.is_allowed_in_lean(path), "{host:?}{path}");
+    }
+}
+
+#[test]
+#[cfg(feature = "lean")]
+fn lean_uri_allowlist_rejects_disabled_hosts_and_actions() {
+    for (host, path) in [
+        (UriHost::Team, "/invite"),
+        (UriHost::SharedSession, "/session-id"),
+        (UriHost::Conversation, "/conversation-id"),
+        (UriHost::Drive, "/object-id"),
+        (UriHost::Home, "/desktop_redirect"),
+        (UriHost::Mcp, "/oauth/callback"),
+        (UriHost::Codex, "/"),
+        (UriHost::Linear, "/work"),
+        (UriHost::ChatGPTLink, "/"),
+        (UriHost::Action, "/new_agent_conversation"),
+        (UriHost::Action, "/new_cloud_agent_conversation"),
+        (UriHost::Action, "/cloud_agent_setup"),
+        (UriHost::Action, "/create_environment"),
+        (UriHost::Action, "/focus_cloud_mode"),
+        (UriHost::Action, "/auto_handoff_to_cloud"),
+        (UriHost::Action, "/auto-handoff-to-cloud"),
+        (UriHost::Action, "/open-repo"),
+        (UriHost::Action, "/unknown"),
+        (UriHost::Settings, "/ai"),
+        (UriHost::Settings, "/billing"),
+        (UriHost::Settings, "/mcp"),
+        (UriHost::Settings, "/unknown"),
+    ] {
+        assert!(!host.is_allowed_in_lean(path), "{host:?}{path}");
+    }
+}

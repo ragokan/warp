@@ -85,7 +85,9 @@ impl SystemInfo {
 
         // If we're doing automated heap usage tracking, set up periodic
         // refreshes of the memory usage data.
-        Self::schedule_refresh(ctx);
+        if !cfg!(feature = "lean") {
+            Self::schedule_refresh(ctx);
+        }
 
         me
     }

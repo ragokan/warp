@@ -14126,6 +14126,9 @@ impl TerminalView {
         body: &str,
         ctx: &mut ViewContext<Self>,
     ) {
+        if cfg!(feature = "lean") {
+            return;
+        }
         let Some(notification) = parse_event(title, body) else {
             return;
         };

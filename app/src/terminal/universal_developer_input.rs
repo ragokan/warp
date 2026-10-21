@@ -804,6 +804,9 @@ impl View for UniversalDeveloperInputButtonBar {
     }
 
     fn render(&self, app: &AppContext) -> Box<dyn warpui::Element> {
+        if cfg!(feature = "lean") {
+            return warpui::elements::Empty::new().finish();
+        }
         let appearance = Appearance::as_ref(app);
         let theme = appearance.theme();
         #[cfg(feature = "voice_input")]

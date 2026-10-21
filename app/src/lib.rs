@@ -620,11 +620,14 @@ impl LaunchMode {
     /// CLI, proxy, TUI) would otherwise contend for the fixed port.
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
     fn should_start_local_http_server(&self) -> bool {
-        self.is_gui()
+        !cfg!(feature = "lean") && self.is_gui()
     }
 
     /// Returns `true` if this process can build and sync codebase indices.
     fn supports_indexing(&self) -> bool {
+        if cfg!(feature = "lean") {
+            return false;
+        }
         match self {
             LaunchMode::CommandLine { command, .. } => {
                 // A pre-warmed sandbox indexes its repositories during preparation, so the
@@ -784,6 +787,9 @@ pub fn run() -> Result<()> {
     // Ensure feature flags are initialized before parsing command-line arguments.
     features::init_feature_flags();
     if let Some(args) = warp_cli::local_control::ControlArgs::from_control_mode_env() {
+        if cfg!(feature = "lean") {
+            anyhow::bail!("Warp Control CLI is disabled in the lean build");
+        }
         #[cfg(windows)]
         warp_util::windows::attach_to_parent_console();
         warp_cli::local_control::run_and_exit(args);
@@ -791,6 +797,19 @@ pub fn run() -> Result<()> {
 
     // Parse command-line arguments.
     let args = warp_cli::Args::from_env();
+    #[cfg(feature = "lean")]
+    if matches!(args.command(), Some(warp_cli::Command::CommandLine(_)))
+        || matches!(
+            args.command(),
+            Some(warp_cli::Command::Worker(
+                warp_cli::WorkerCommand::RemoteServerProxy(_)
+                    | warp_cli::WorkerCommand::RemoteServerDaemon(_)
+                    | warp_cli::WorkerCommand::AcpBridge { .. }
+            ))
+        )
+    {
+        anyhow::bail!("Oz and remote agents are disabled in the lean build");
+    }
 
     // Server URL overrides are only honored on internal dev channels. Release channels silently
     // ignore `--server-root-url` / `--ws-server-url` / `--session-sharing-server-url` (and their
@@ -1112,7 +1131,7 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
     // so they can be replayed to Sentry once it's ready.
     #[cfg_attr(
         not(all(
-            feature = "release_bundle",
+            any(feature = "release_bundle", feature = "lean"),
             any(windows, any(target_os = "linux", target_os = "freebsd"))
         )),
         expect(unused_mut)
@@ -1120,7 +1139,7 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
     let mut pre_sentry_errors: Vec<anyhow::Error> = Vec::new();
 
     #[cfg(all(
-        feature = "release_bundle",
+        any(feature = "release_bundle", feature = "lean"),
         any(target_os = "linux", target_os = "freebsd")
     ))]
     if let LaunchMode::App { .. } = launch_mode {
@@ -1796,7 +1815,9 @@ pub(crate) fn initialize_app(
             manager.subscribe_to_tui_api_key_changes(ctx);
         }
         #[cfg(not(target_family = "wasm"))]
-        manager.subscribe_to_settings_changes(ctx);
+        if !cfg!(feature = "lean") {
+            manager.subscribe_to_settings_changes(ctx);
+        }
         // Gemini Enterprise (GEAP) credential refresh triggers: workspace
         // settings saves / team changes and the member's enablement toggle.
         #[cfg(not(target_family = "wasm"))]
@@ -2372,7 +2393,9 @@ pub(crate) fn initialize_app(
             window_settings::migrate_legacy_background_backdrop(ctx);
         }
     });
-    ai::custom_endpoints::init(launch_mode, ctx);
+    if !cfg!(feature = "lean") {
+        ai::custom_endpoints::init(launch_mode, ctx);
+    }
 
     // LogManager must be registered before any subsystem (e.g. MCP, LSP) that creates file-based loggers.
     ctx.add_singleton_model(|_| simple_logger::manager::LogManager::new());
@@ -3135,7 +3158,8 @@ fn on_close_window_cancelled(
 }
 
 fn is_cloud_agent_web_home_launch_url(url: &Url) -> bool {
-    url.scheme() == ChannelState::url_scheme()
+    !cfg!(feature = "lean")
+        && url.scheme() == ChannelState::url_scheme()
         && url.host_str() == Some("action")
         && url.path() == "/new_cloud_agent_conversation"
         && url

@@ -155,6 +155,9 @@ impl Default for Background {
             num_cpus::get()
         };
 
+        #[cfg(feature = "lean")]
+        let num_threads = num_threads.min(4);
+
         Self::new(num_threads, |i| format!("background-executor-{i}"))
     }
 }

@@ -682,6 +682,10 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     main_page::init_actions_from_parent_view(app, context, builder);
     appearance_page::init_actions_from_parent_view(app, context, builder);
     features_page::init_actions_from_parent_view(app, context, builder);
+    if cfg!(feature = "lean") {
+        privacy_page::init_actions_from_parent_view(app, context, builder);
+        return;
+    }
     warpify_page::init_actions_from_parent_view(app, context, builder);
     privacy_page::init_actions_from_parent_view(app, context, builder);
     warp_agent_page::init_actions_from_parent_view(app, context, builder);
@@ -1179,7 +1183,7 @@ pub struct SettingsView {
     clipped_scroll_state: ClippedScrollStateHandle,
     context_menu: ViewHandle<Menu<SettingsAction>>,
     context_menu_state: Option<Vector2F>,
-    environments_page_handle: ViewHandle<EnvironmentsPageView>,
+    environments_page_handle: Option<ViewHandle<EnvironmentsPageView>>,
     /// Sidebar navigation items (pages + umbrellas). This is the single source
     /// of truth for which sections sit under which umbrella.
     nav_items: Vec<SettingsNavItem>,
@@ -1221,6 +1225,72 @@ impl SettingsView {
         ctx.subscribe_to_view(&features_page_handle, |me, _, event, ctx| {
             me.handle_features_page_event(event, ctx);
         });
+
+        if cfg!(feature = "lean") {
+            let keybindings_handle = ctx.add_typed_action_view(KeybindingsView::new);
+            let privacy_page_handle = ctx.add_typed_action_view(PrivacyPageView::new);
+            ctx.subscribe_to_view(&privacy_page_handle, |me, _, event, ctx| {
+                me.handle_privacy_page_event(event, ctx);
+            });
+            let about_page_handle = ctx.add_typed_action_view(AboutPageView::new);
+            let font_family = Appearance::as_ref(ctx).ui_font_family();
+            let search_editor = ctx.add_typed_action_view(|ctx| {
+                let options = SingleLineEditorOptions {
+                    text: TextOptions {
+                        font_family_override: Some(font_family),
+                        ..Default::default()
+                    },
+                    propagate_and_no_op_vertical_navigation_keys:
+                        PropagateAndNoOpNavigationKeys::Always,
+                    ..Default::default()
+                };
+                let mut editor = EditorView::single_line(options, ctx);
+                editor.set_placeholder_text("Search", ctx);
+                editor
+            });
+            ctx.subscribe_to_view(&search_editor, Self::handle_search_editor_event);
+            let context_menu = ctx.add_typed_action_view(|_| {
+                Menu::new()
+                    .prevent_interaction_with_other_elements()
+                    .with_drop_shadow()
+            });
+            ctx.subscribe_to_view(&context_menu, |me, _, event, ctx| {
+                me.handle_menu_event(event, ctx);
+            });
+            let settings_pages = vec![
+                SettingsPage::new(main_page_handle),
+                SettingsPage::new(appearance_page_handle),
+                SettingsPage::new(features_page_handle),
+                SettingsPage::new(keybindings_handle),
+                SettingsPage::new(privacy_page_handle),
+                SettingsPage::new(about_page_handle),
+            ];
+            let initial_page = page
+                .filter(|section| settings_pages.iter().any(|page| page.section == *section))
+                .unwrap_or_default();
+            return Self {
+                pages_filter: settings_pages
+                    .iter()
+                    .map(|_| MatchData::Uncounted(true))
+                    .collect(),
+                nav_items: settings_pages
+                    .iter()
+                    .map(|page| SettingsNavItem::Page(page.section))
+                    .collect(),
+                settings_pages,
+                current_settings_page: initial_page,
+                pane_configuration,
+                focus_handle: None,
+                search_editor,
+                clipped_scroll_state: Default::default(),
+                context_menu,
+                context_menu_state: Default::default(),
+                environments_page_handle: None,
+                settings_file_error: None,
+                settings_error_banner_dismissed: false,
+                footer_mouse_states: SettingsFooterMouseStates::default(),
+            };
+        }
 
         // Shared blocks page
         let block_client = ServerApiProvider::as_ref(ctx).get_block_client();
@@ -1485,7 +1555,7 @@ impl SettingsView {
             clipped_scroll_state: Default::default(),
             context_menu,
             context_menu_state: Default::default(),
-            environments_page_handle,
+            environments_page_handle: Some(environments_page_handle),
             nav_items,
             settings_file_error: None,
             settings_error_banner_dismissed: false,
@@ -2111,6 +2181,18 @@ impl SettingsView {
     }
 
     fn should_render_page(&self, settings_page: &SettingsPage, app: &AppContext) -> bool {
+        #[cfg(feature = "lean")]
+        if !matches!(
+            settings_page.section,
+            SettingsSection::Account
+                | SettingsSection::Appearance
+                | SettingsSection::Features
+                | SettingsSection::Keybindings
+                | SettingsSection::Privacy
+                | SettingsSection::About
+        ) {
+            return false;
+        }
         match &settings_page.view_handle {
             SettingsPageViewHandle::Main(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::Teams(v) => v.as_ref(app).should_render(app),
@@ -2689,8 +2771,8 @@ impl View for SettingsView {
         // Render environment setup mode selector overlay when open.
         if let Some(selector_handle) = self
             .environments_page_handle
-            .as_ref(app)
-            .environment_setup_mode_selector_handle()
+            .as_ref()
+            .and_then(|handle| handle.as_ref(app).environment_setup_mode_selector_handle())
         {
             stack.add_child(ChildView::new(selector_handle).finish());
         }
@@ -2698,8 +2780,8 @@ impl View for SettingsView {
         // Render agent-assisted environment modal overlay when open.
         if let Some(modal_handle) = self
             .environments_page_handle
-            .as_ref(app)
-            .agent_assisted_environment_modal_handle(app)
+            .as_ref()
+            .and_then(|handle| handle.as_ref(app).agent_assisted_environment_modal_handle(app))
         {
             stack.add_child(ChildView::new(modal_handle).finish());
         }

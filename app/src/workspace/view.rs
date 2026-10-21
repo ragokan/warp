@@ -4968,6 +4968,9 @@ impl Workspace {
     }
 
     fn toggle_ai_assistant_panel(&mut self, ctx: &mut ViewContext<Self>) {
+        if cfg!(feature = "lean") {
+            return;
+        }
         // Now that the user has interacted with the panel, we can close
         // the dialogue and mark it as dismissed.
         if self.should_show_ai_assistant_warm_welcome {
@@ -10133,6 +10136,22 @@ impl Workspace {
                     .into_item(),
             );
         }
+        #[cfg(feature = "lean")]
+        items.retain(|item| {
+            if let MenuItem::Item(fields) = item {
+                !matches!(
+                    fields.on_select_action(),
+                    Some(
+                        WorkspaceAction::ViewLatestChangelog
+                            | WorkspaceAction::ShowUpgrade
+                            | WorkspaceAction::ShowReferralSettingsPage
+                            | WorkspaceAction::ShowSettingsPage(SettingsSection::BillingAndUsage)
+                    )
+                )
+            } else {
+                true
+            }
+        });
         items
     }
 
@@ -21649,7 +21668,8 @@ impl Workspace {
         }
 
         // Legacy AI assistant button (non-agent-mode only)
-        if is_online
+        if !cfg!(feature = "lean")
+            && is_online
             && !FeatureFlag::AgentMode.is_enabled()
             && !is_web_anonymous_user
             && !self.current_workspace_state.is_ai_assistant_panel_open

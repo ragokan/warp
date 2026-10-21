@@ -225,6 +225,8 @@ impl PrivacyPageView {
             Box::new(CrashReportsWidget::default()),
             Box::new(CloudConversationStorageWidget::default()),
         ];
+        #[cfg(feature = "lean")]
+        widgets.clear();
         if ContextFlag::NetworkLogConsole.is_enabled() {
             widgets.push(Box::new(NetworkLogWidget::default()));
         }

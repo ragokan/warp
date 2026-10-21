@@ -304,7 +304,7 @@ impl AIRequestUsageModel {
         ctx: &mut ModelContext<Self>,
     ) -> Receiver<Option<usize>> {
         let (sender, receiver) = oneshot::channel();
-        if !AuthStateProvider::as_ref(ctx).get().is_logged_in() {
+        if cfg!(feature = "lean") || !AuthStateProvider::as_ref(ctx).get().is_logged_in() {
             let _ = sender.send(None);
             return receiver;
         }
@@ -383,7 +383,7 @@ impl AIRequestUsageModel {
     }
 
     pub fn request_availability_refresh(&mut self, ctx: &mut ModelContext<Self>) {
-        if !AuthStateProvider::as_ref(ctx).get().is_logged_in() {
+        if cfg!(feature = "lean") || !AuthStateProvider::as_ref(ctx).get().is_logged_in() {
             return;
         }
         if self.server_availability.refresh_in_flight {
