@@ -15,6 +15,9 @@ use warpui_core::AssetProvider;
 // embedded asset set to keep the CLI binary small — mirroring the carve-out
 // already applied for the WASM target above.
 #[cfg_attr(feature = "standalone", exclude = "async/**")]
+// Lean has no onboarding, launch modals or other product imagery; only the theme backgrounds in
+// `async/jpg` are still shown.
+#[cfg_attr(feature = "lean", exclude = "async/png/**")]
 pub struct Assets;
 
 impl AssetProvider for Assets {
@@ -24,3 +27,7 @@ impl AssetProvider for Assets {
             .ok_or_else(|| anyhow!("no asset exists at path {}", path))
     }
 }
+
+#[cfg(test)]
+#[path = "lib_tests.rs"]
+mod tests;

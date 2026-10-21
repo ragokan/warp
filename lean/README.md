@@ -137,6 +137,7 @@ fixes listed below also apply to default builds.
 | `Cargo.toml` | Stripped release-derived `lean` profile with ThinLTO. |
 | `app/Cargo.toml` | `lean` feature forwards the executor limit to `warpui_core`. |
 | `crates/warpui_core/Cargo.toml` | Adds opt-in `lean` feature. |
+| `crates/warp_assets/Cargo.toml`, `crates/warp_assets/src/lib.rs`, `app/Cargo.toml` | Lean does not embed `async/png` (onboarding, launch-modal and Oz imagery that no lean surface shows); `async/jpg` theme backgrounds and `bundled/` stay. A missing asset only fails that image's load. |
 | `crates/warpui_core/src/lean.rs`, `keymap.rs`, `platform/menu.rs`, `crates/warp_core/src/context_flag.rs` | Central lean surface/settings policy, binding/menu filters and disabled legacy contexts; also hides Log out, Sign up, Settings sync, the Account page binding and the `account.is_settings_sync_enabled` key. |
 | `crates/warpui/src/platform/mac/menus.rs` | Reads the shared display-name helper for macOS app-menu labels. |
 | `crates/warpui_core/src/ui_components/link.rs` | Filters hidden help links while keeping privacy links. |

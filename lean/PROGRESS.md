@@ -1,5 +1,21 @@
 # Lean build progress
 
+## 2026-10-21 — unused bundled assets
+
+- `warp_assets` gains a `lean` feature (enabled by the app's `lean` feature) that excludes
+  `async/png` (50 MB: onboarding, launch-modal and Oz imagery) from the embedded assets. Onboarding
+  needs `FeatureFlag::AgentOnboarding`, which no lean build enables, and the modals belong to
+  removed surfaces; a missing asset only fails that image's load. `async/jpg` (theme backgrounds)
+  and `bundled/` stay.
+- Tested: `async_assets_follow_the_lean_and_standalone_features` failed with the exclusion removed
+  and passes with it, with the default features and with `standalone` (which drops all of `async/`).
+- Measured (Docker, `lean` profile, same toolchain, `lean/build.sh` features): baseline
+  9ff726424 is 313,836,120 bytes, commits 1–3 together 262,259,240 (−51,576,880, −16.4%); the
+  removed PNGs are 51,500,874 bytes, so the offline and avatar changes net about −76 KB.
+- Not done: dropping tree-sitter/arborium grammars (hard-coded per language in
+  `crates/languages/src/lib.rs`, so each would need its own edit and its own test) and a smaller
+  `opt-level` (changes terminal hot-path speed; needs a GUI measurement first).
+
 ## 2026-10-21 — avatar from the config directory
 
 - The avatar button shows `avatar.png`, `avatar.jpg` or `avatar.jpeg` from the config directory
