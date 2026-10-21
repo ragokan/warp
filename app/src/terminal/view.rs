@@ -14741,6 +14741,9 @@ impl TerminalView {
         session: &Arc<Session>,
         ctx: &mut ViewContext<Self>,
     ) -> bool {
+        if cfg!(feature = "lean") {
+            return false;
+        }
         // Is this the active session?
         // We should only show the vim keybindings banner in one place at a time.
         if !self.is_active_session(ctx) {
@@ -16632,7 +16635,7 @@ impl TerminalView {
         block_completed: &UserBlockCompleted,
         ctx: &mut ViewContext<TerminalView>,
     ) {
-        if *InputSettings::as_ref(ctx).command_corrections.value() {
+        if InputSettings::as_ref(ctx).command_corrections_enabled() {
             let session_id = self.active_block_session_id();
 
             let session = session_id.and_then(|id| self.sessions.as_ref(ctx).get(id));
@@ -17874,7 +17877,9 @@ impl TerminalView {
                     items.push(self.paste_menu_item(ctx));
                 }
 
-                items.push(MenuItem::Separator);
+                if !cfg!(feature = "lean") {
+                    items.push(MenuItem::Separator);
+                }
                 items.push(
                     MenuItemFields::new(share_block_label)
                         .with_on_select_action(TerminalAction::ContextMenu(
@@ -25486,7 +25491,8 @@ impl TerminalView {
         let filtered_blocks: HashSet<_> = model.block_list().filtered_blocks();
 
         let snackbar_header_state = SnackbarHeaderState {
-            snackbar_enabled: *BlockListSettings::as_ref(app).snackbar_enabled,
+            snackbar_enabled: !cfg!(feature = "lean")
+                && *BlockListSettings::as_ref(app).snackbar_enabled,
             show_snackbar: self.show_snackbar,
             hover_near_snackbar_area: self.hover_near_snackbar_area,
             state_handle: self.snackbar_header_state.state_handle.clone(),
@@ -25543,7 +25549,9 @@ impl TerminalView {
                         let mouse_state = mouse_states.get(block_index)?.clone();
                         let is_bookmarked = bookmarked_blocks.contains(block_index);
 
-                        if is_bookmarked || hovered_index == Some(*block_index) {
+                        if !cfg!(feature = "lean")
+                            && (is_bookmarked || hovered_index == Some(*block_index))
+                        {
                             Some(Self::render_bookmark_element(
                                 *block_index,
                                 mouse_state,
@@ -25573,9 +25581,9 @@ impl TerminalView {
                                 filtered_blocks.is_some_and(|filtered_blocks| {
                                     filtered_blocks.contains(block_index)
                                 });
-                            if has_active_filter
+                            if !cfg!(feature = "lean") && (has_active_filter
                                 || hovered_index == Some(*block_index)
-                                || active_filter_editor_block_index == Some(*block_index)
+                                || active_filter_editor_block_index == Some(*block_index))
                             {
                                 Some(Self::render_filter_element(
                                     *block_index,

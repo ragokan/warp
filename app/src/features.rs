@@ -566,7 +566,6 @@ fn is_allowed_in_lean(flag: FeatureFlag) -> bool {
             | FeatureFlag::ImeMarkedText
             | FeatureFlag::ValidateAutosuggestions
             | FeatureFlag::ClearAutosuggestionOnEscape
-            | FeatureFlag::CommandCorrectionKey
             | FeatureFlag::TabCloseButtonOnLeft
             | FeatureFlag::UndoClosedPanes
             | FeatureFlag::AllowOpeningFileLinksUsingEditorEnv
@@ -578,12 +577,6 @@ fn is_allowed_in_lean(flag: FeatureFlag) -> bool {
             | FeatureFlag::AsyncFind
             | FeatureFlag::NewTabStyling
             | FeatureFlag::KittyKeyboardProtocol
-            | FeatureFlag::DirectoryTabColors
-            | FeatureFlag::VerticalTabs
-            | FeatureFlag::VerticalTabsSummaryMode
-            | FeatureFlag::TabConfigs
-            | FeatureFlag::GroupedTabs
-            | FeatureFlag::PinnedTabs
             | FeatureFlag::SkipFirebaseAnonymousUser
             | FeatureFlag::TrimTrailingBlankLines
             | FeatureFlag::OscHyperlinks

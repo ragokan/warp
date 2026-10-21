@@ -395,6 +395,9 @@ impl TabData {
 
     /// The resolved tab color: manual selection takes priority over directory default.
     pub fn color(&self) -> Option<AnsiColorIdentifier> {
+        if cfg!(feature = "lean") {
+            return None;
+        }
         self.selected_color.resolve(self.default_directory_color)
     }
 
@@ -879,6 +882,9 @@ impl TabData {
         index: usize,
         terminal_colors: AnsiColors,
     ) -> Vec<MenuItem<WorkspaceAction>> {
+        if cfg!(feature = "lean") {
+            return vec![];
+        }
         if FeatureFlag::DirectoryTabColors.is_enabled() {
             color_picker_menu_items(
                 self.color(),

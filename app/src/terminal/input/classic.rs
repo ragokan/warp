@@ -98,7 +98,7 @@ impl Input {
 
         let is_compact_mode = matches!(
             TerminalSettings::as_ref(app).spacing_mode.value(),
-            SpacingMode::Compact
+            SpacingMode::Compact if !cfg!(feature = "lean")
         );
         let mut column = Flex::column();
 

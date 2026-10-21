@@ -47,6 +47,9 @@ impl TerminalView {
         block_completed: &UserBlockCompleted,
         ctx: &mut ViewContext<TerminalView>,
     ) {
+        if cfg!(feature = "lean") {
+            return;
+        }
         if let Some(active_block_metadata) = self.active_block_metadata.as_ref() {
             let Some(session) = active_block_metadata
                 .session_id()

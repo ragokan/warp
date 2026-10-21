@@ -101,3 +101,9 @@ define_settings_group!(CodeSettings, settings: [
         description: "Whether the Warp text editor automatically saves changes as you type and when the editor loses focus.",
     },
 ]);
+
+impl CodeSettings {
+    pub fn project_explorer_enabled(&self) -> bool {
+        !cfg!(feature = "lean") && *self.show_project_explorer
+    }
+}

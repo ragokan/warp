@@ -6975,7 +6975,7 @@ impl Input {
                 );
             }
             InputSettingsChangedEvent::ErrorUnderliningEnabled { .. } => {
-                if !*input_settings.as_ref(ctx).error_underlining.value() {
+                if !input_settings.as_ref(ctx).error_underlining_enabled() {
                     self.clear_decorations(ctx);
                 }
                 self.run_input_background_jobs(
@@ -16496,7 +16496,7 @@ impl Input {
             self.should_show_universal_developer_input(app) || FeatureFlag::AgentView.is_enabled();
 
         let is_compact_mode =
-            matches!(terminal_settings.spacing_mode.value(), SpacingMode::Compact)
+            matches!(terminal_settings.spacing_mode.value(), SpacingMode::Compact if !cfg!(feature = "lean"))
                 && !is_udi_style_spacing;
 
         // In compact mode, allocate some extra padding for the Vim status bar.

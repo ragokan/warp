@@ -53,7 +53,7 @@ OSS directories follow XDG overrides, otherwise:
 - State/logs: `~/.local/state/warp-oss`
 - Cache: `~/.cache/warp-oss`
 
-Only missing `settings.toml`, `keybindings.yaml`, `themes` and `tab_configs` are copied from the
+Only missing `settings.toml`, `keybindings.yaml`, `themes` are copied from the
 corresponding `warp-terminal` directories. Existing OSS copies are preserved. Legacy
 `user_preferences.json` is omitted because it contains free-form saved prompts and cannot be
 established to be secret-free. No auth files, tokens, keychain entries or databases are migrated.
@@ -68,6 +68,24 @@ Turning Settings sync off and then on uses upstream `ForceCloudToMatchLocal`: cl
 are overwritten with this lean installation's local values. The first install copied the
 stable installation's settings; review local choices before toggling sync back on.
 
+Lean also hides AI/Drive/MCP/notebooks, analytics/crash-reporting actions, sharing, teams,
+billing and referrals from bindings, slash commands, menus, tips, login copy, banners,
+tooltips and the settings schema.
+Hidden preferences remain stored: registration excludes them from sync and duplicate cleanup;
+the TOML backend refuses their writes/deletes while preserving the loaded document.
+Lean no longer performs the legacy privacy migration or GetUserSettings, so eleven upstream
+tests are lean-excluded: ten passed at c13eb5653; duplicate-cleanup already failed there because
+it expected a fourth operation for the cloud-agent timestamp fetch that lean skips.
+`notifications.preferences` is the preservation exception: its full compound schema/value
+remains so ordinary terminal notifications still persist and sync; the agent row is hidden.
+
+Also hidden: local/cloud workflows; Warp's editor/review/file tree and Markdown viewer;
+tab/launch configurations, groups/pins/colours/vertical tabs; block bookmarks/filter/sticky
+headers/compact mode; community/help links; Vim and command corrections (error underlining and suggested fixes). File and Markdown
+links use the selected external editor, `$EDITOR`, or the system default. Plain tabs, rename,
+blocks, Find, copy and syntax highlighting remain. The “Show Warp network log” binding
+(`input:insert_network_logging_workflow`) is hidden with Workflows; the Privacy-page viewer stays.
+
 ## Patches
 
 Every upstream change is gated by `lean`; default upstream behavior is retained.
@@ -78,6 +96,7 @@ Every upstream change is gated by `lean`; default upstream behavior is retained.
 | `app/Cargo.toml` | `lean` feature forwards the executor limit to `warpui_core`. |
 | `crates/warpui_core/Cargo.toml` | Adds opt-in `lean` feature. |
 | `crates/warpui_core/src/lean.rs`, `keymap.rs`, `platform/menu.rs`, `crates/warp_core/src/context_flag.rs` | Central lean surface/settings policy, binding/menu filters and disabled legacy contexts. |
+| `crates/warpui_core/src/ui_components/link.rs` | Filters hidden help links while keeping privacy links. |
 | `crates/settings/src/registration.rs`, `crates/warpui_extras/src/user_preferences/toml_backed.rs` | Excludes hidden settings from registration and prevents writes/deletes without changing the loaded document. |
 | `crates/warpui_core/src/async/native/executor.rs` | Caps the shared background executor at four workers. |
 | `app/src/features.rs` | Final terminal allowlist removes AI, MCP, Oz, cloud agents, sharing, recording, update, changelog and telemetry flags. Existing user-preference precedence pins exclusions off even if server experiments call `set_enabled`. Runtime feature menu is also disabled. |

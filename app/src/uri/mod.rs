@@ -164,11 +164,8 @@ impl UriHost {
     #[cfg(feature = "lean")]
     fn is_allowed_in_lean(&self, path: &str) -> bool {
         match self {
-            Self::Auth | Self::Launch | Self::TabConfig | Self::Session => true,
-            Self::Action => matches!(
-                path,
-                "/new_tab" | "/new_window" | "/open_file_editor" | "/docker/open_subshell"
-            ),
+            Self::Auth | Self::Session => true,
+            Self::Action => matches!(path, "/new_tab" | "/new_window" | "/docker/open_subshell"),
             Self::Settings => matches!(
                 path,
                 "" | "/"
@@ -180,6 +177,8 @@ impl UriHost {
                     | "/about"
             ),
             Self::Team
+            | Self::Launch
+            | Self::TabConfig
             | Self::SharedSession
             | Self::Conversation
             | Self::Drive

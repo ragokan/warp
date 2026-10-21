@@ -39,6 +39,14 @@ impl LinkStyles {
 impl UiComponent for Link {
     type ElementType = Container;
     fn build(self) -> Container {
+        if !crate::lean::surface_is_allowed("", &self.text)
+            || self
+                .url
+                .as_deref()
+                .is_some_and(|url| !crate::lean::link_is_allowed(url))
+        {
+            return Container::new(crate::elements::Empty::new().finish());
+        }
         let url = self.url.clone();
         Container::new(
             Hoverable::new(self.hover_state.clone(), |state| {

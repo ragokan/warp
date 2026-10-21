@@ -98,7 +98,7 @@ impl Input {
     /// Whether or not error underlining should be computed and applied to the
     /// input text.
     fn should_show_error_underlining(&self, ctx: &ViewContext<Self>) -> bool {
-        *InputSettings::as_ref(ctx).error_underlining.value()
+        InputSettings::as_ref(ctx).error_underlining_enabled()
     }
 
     fn run_input_mode_detection(

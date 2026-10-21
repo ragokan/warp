@@ -2264,6 +2264,9 @@ impl View for LocalCodeEditorView {
     }
 
     fn render(&self, app: &AppContext) -> Box<dyn warpui::Element> {
+        if cfg!(feature = "lean") {
+            return warpui::elements::Empty::new().finish();
+        }
         // Rendering the remote disconnection banner or version conflict banner.
         // Only show the disconnection banner if the file was successfully loaded;
         // if it never loaded, the error/loading state handles that.

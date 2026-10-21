@@ -22,7 +22,7 @@ for file in settings.toml keybindings.yaml; do
         cp -p "$config/warp-terminal/$file" "$config/warp-oss/$file"
     fi
 done
-for directory in themes tab_configs; do
+for directory in themes; do
     if [[ ! -e $data/warp-oss/$directory && -d $data/warp-terminal/$directory ]]; then
         cp -a "$data/warp-terminal/$directory" "$data/warp-oss/$directory"
     fi

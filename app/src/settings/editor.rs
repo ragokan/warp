@@ -293,7 +293,7 @@ impl AppEditorSettings {
     }
 
     pub fn vim_mode_enabled(&self) -> bool {
-        *self.vim_mode.value()
+        !cfg!(feature = "lean") && *self.vim_mode.value()
     }
 
     pub fn cursor_blink_enabled(&self) -> bool {

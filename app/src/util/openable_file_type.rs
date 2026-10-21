@@ -178,6 +178,9 @@ pub fn resolve_file_target_to_open_in_warp(
     settings: &EditorSettings,
     layout: Option<EditorLayout>,
 ) -> FileTarget {
+    if cfg!(feature = "lean") {
+        return resolve_file_target(path, settings, layout);
+    }
     let openable_file_type = is_file_openable_in_warp(path);
     let is_markdown = matches!(openable_file_type, Some(OpenableFileType::Markdown));
     let layout = layout.unwrap_or(*settings.open_file_layout);
@@ -220,6 +223,12 @@ pub fn resolve_file_target_with_editor_choice(
     default_layout: EditorLayout,
     layout: Option<EditorLayout>,
 ) -> FileTarget {
+    let editor_choice = if cfg!(feature = "lean") && editor_choice == EditorChoice::Warp {
+        EditorChoice::SystemDefault
+    } else {
+        editor_choice
+    };
+    let prefer_markdown_viewer = prefer_markdown_viewer && !cfg!(feature = "lean");
     let is_openable_in_warp = is_file_openable_in_warp(path);
     let is_markdown = matches!(is_openable_in_warp, Some(OpenableFileType::Markdown));
     let layout = layout.unwrap_or(default_layout);

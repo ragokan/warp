@@ -63,7 +63,7 @@ impl HeaderToolbarItemKind {
                 FeatureFlag::VerticalTabs.is_enabled()
                     && *TabSettings::as_ref(app).use_vertical_tabs
             }
-            Self::ToolsPanel => true,
+            Self::ToolsPanel => !cfg!(feature = "lean"),
             Self::AgentManagement => {
                 let is_web_anonymous_user = AuthStateProvider::as_ref(app)
                     .get()
@@ -73,7 +73,7 @@ impl HeaderToolbarItemKind {
                     && FeatureFlag::AgentManagementView.is_enabled()
                     && !is_web_anonymous_user
             }
-            Self::CodeReview => cfg!(feature = "local_fs"),
+            Self::CodeReview => !cfg!(feature = "lean") && cfg!(feature = "local_fs"),
             Self::NotificationsMailbox => FeatureFlag::HOANotifications.is_enabled(),
         }
     }

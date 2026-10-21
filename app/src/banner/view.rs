@@ -62,7 +62,16 @@ impl<T: Action + Clone> BannerTextContent<T> {
 
     pub fn formatted_text(text: FormattedTextInline) -> Self {
         Self {
-            text,
+            text: text
+                .into_iter()
+                .filter(|fragment| match &fragment.styles.hyperlink {
+                    Some(markdown_parser::Hyperlink::Url(url)) => {
+                        warpui::lean::surface_is_allowed("", &fragment.text)
+                            && warpui::lean::link_is_allowed(url)
+                    }
+                    _ => true,
+                })
+                .collect(),
             highlighted_link: Default::default(),
             phantom_data: PhantomData,
         }
@@ -358,3 +367,7 @@ impl<T: Action + Clone> View for Banner<T> {
 fn font_size(appearance: &Appearance) -> f32 {
     appearance.ui_font_size()
 }
+
+#[cfg(all(test, feature = "lean"))]
+#[path = "view_tests.rs"]
+mod tests;

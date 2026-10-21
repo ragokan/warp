@@ -43,6 +43,20 @@ fn disable_flag(flag: ContextFlag) {
 
 impl ContextFlag {
     pub fn is_enabled(&self) -> bool {
+        if warpui_core::lean::IS_LEAN
+            && matches!(
+                self,
+                Self::CreateSharedSession
+                    | Self::ShowRewardModal
+                    | Self::PromptForVersionUpdates
+                    | Self::RunWorkflow
+                    | Self::LaunchConfigurations
+                    | Self::WarpEssentials
+                    | Self::ShowMCPServers
+            )
+        {
+            return false;
+        }
         FLAG_STATES[*self as usize].load(Ordering::Relaxed)
     }
 

@@ -211,6 +211,9 @@ define_settings_group!(TerminalSettings, settings: [
 impl TerminalSettings {
     /// Spacing for the terminal blocks.
     pub fn terminal_spacing(&self, line_height_ratio: f32, ctx: &AppContext) -> TerminalSpacing {
+        if cfg!(feature = "lean") {
+            return TerminalSpacing::normal(line_height_ratio, ctx);
+        }
         match *self.spacing_mode {
             SpacingMode::Normal => TerminalSpacing::normal(line_height_ratio, ctx),
             SpacingMode::Compact => TerminalSpacing::compact(line_height_ratio, ctx),
@@ -239,6 +242,9 @@ impl TerminalSettings {
         let should_force_normal_spacing =
             InputSettings::as_ref(ctx).is_universal_developer_input_enabled(ctx);
         if should_force_normal_spacing {
+            return TerminalSpacing::normal(line_height_ratio, ctx);
+        }
+        if cfg!(feature = "lean") {
             return TerminalSpacing::normal(line_height_ratio, ctx);
         }
         match *self.spacing_mode {

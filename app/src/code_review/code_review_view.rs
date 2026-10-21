@@ -7042,6 +7042,9 @@ impl Entity for CodeReviewView {
 
 impl View for CodeReviewView {
     fn render(&self, ctx: &AppContext) -> Box<dyn Element> {
+        if cfg!(feature = "lean") {
+            return warpui::elements::Empty::new().finish();
+        }
         let appearance = Appearance::as_ref(ctx);
 
         if self.active_repo.is_none() {

@@ -168,8 +168,14 @@ fn render_title(
 fn render_inline_block_list_banner(
     style: InlineBannerStyle,
     appearance: &Appearance,
-    inline_banner_content: InlineBannerContent,
+    mut inline_banner_content: InlineBannerContent,
 ) -> Box<dyn Element> {
+    if !warpui::lean::surface_is_allowed("", &inline_banner_content.title) {
+        return warpui::elements::Empty::new().finish();
+    }
+    inline_banner_content
+        .buttons
+        .retain(|button| warpui::lean::surface_is_allowed("", &button.text));
     let theme = appearance.theme();
     let title_font_size = appearance.ui_font_size() + 1.;
     let button_text_size = title_font_size;

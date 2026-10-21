@@ -6637,6 +6637,20 @@ impl Workspace {
             return;
         }
 
+        let target = if cfg!(feature = "lean")
+            && matches!(
+                target,
+                FileTarget::CodeEditor(_) | FileTarget::MarkdownViewer(_)
+            ) {
+            crate::util::openable_file_type::resolve_file_target(
+                &path,
+                EditorSettings::as_ref(ctx),
+                None,
+            )
+        } else {
+            target
+        };
+
         match target {
             FileTarget::MarkdownViewer(layout) => {
                 let session = self.get_active_session(ctx);
@@ -23082,7 +23096,7 @@ impl Workspace {
 
         // Resource center and AI assistant are workspace-level panels, not configurable.
         #[cfg(not(target_family = "wasm"))]
-        if self.current_workspace_state.is_right_panel_open() {
+        if !cfg!(feature = "lean") && self.current_workspace_state.is_right_panel_open() {
             let right_panel_content = if self.current_workspace_state.is_resource_center_open {
                 Some(self.render_panel(app, self.render_resource_center(), &PanelPosition::Right))
             } else if self.current_workspace_state.is_ai_assistant_panel_open {
@@ -23280,7 +23294,7 @@ impl Workspace {
         let ssh_settings = SshSettings::as_ref(app);
 
         let is_compact_mode =
-            matches!(terminal_settings.spacing_mode.value(), SpacingMode::Compact);
+            !cfg!(feature = "lean") && matches!(terminal_settings.spacing_mode.value(), SpacingMode::Compact);
         if is_compact_mode {
             context.set.insert(flags::COMPACT_MODE_CONTEXT_FLAG);
         }
@@ -23398,11 +23412,11 @@ impl Workspace {
                 .insert(flags::NATIVE_SHELL_COMPLETIONS_CONTEXT_FLAG);
         }
 
-        if *input_settings.command_corrections.value() {
+        if input_settings.command_corrections_enabled() {
             context.set.insert(flags::COMMAND_CORRECTIONS_CONTEXT_FLAG);
         }
 
-        if *input_settings.error_underlining.value() {
+        if input_settings.error_underlining_enabled() {
             context.set.insert(flags::ERROR_UNDERLINING_FLAG);
         }
 
@@ -23457,7 +23471,7 @@ impl Workspace {
             context.set.insert(flags::CURSOR_BLINK_CONTEXT_FLAG);
         }
 
-        if *editor_settings.vim_mode.value() {
+        if editor_settings.vim_mode_enabled() {
             context.set.insert(flags::VIM_MODE_CONTEXT_FLAG);
             if *editor_settings.vim_unnamed_system_clipboard.value() {
                 context.set.insert(flags::VIM_UNNAMED_SYSTEM_CLIPBOARD);
@@ -23572,7 +23586,7 @@ impl Workspace {
             context.set.insert(flags::MIDDLE_CLICK_PASTE_FLAG);
         }
 
-        if *code_settings.code_as_default_editor.value() {
+        if !cfg!(feature = "lean") && *code_settings.code_as_default_editor.value() {
             context.set.insert(flags::CODE_AS_DEFAULT_EDITOR);
         }
 
@@ -24087,7 +24101,7 @@ impl Workspace {
     /// Computes the list of available left panel views based on current AI settings and feature flags.
     fn compute_left_panel_views(ctx: &AppContext) -> Vec<ToolPanelView> {
         let mut views = vec![];
-        if cfg!(feature = "local_fs") && *CodeSettings::as_ref(ctx).show_project_explorer.value() {
+        if cfg!(feature = "local_fs") && CodeSettings::as_ref(ctx).project_explorer_enabled() {
             views.push(ToolPanelView::ProjectExplorer);
         }
         if FeatureFlag::AgentViewConversationListView.is_enabled()
@@ -26441,14 +26455,14 @@ impl TypedActionView for Workspace {
                 );
             }
             ToggleProjectExplorer => {
-                if *CodeSettings::as_ref(ctx).show_project_explorer {
+                if CodeSettings::as_ref(ctx).project_explorer_enabled() {
                     let is_showing = self.left_panel_view.as_ref(ctx).active_view()
                         == ToolPanelView::ProjectExplorer;
                     self.toggle_left_panel_view(&LeftPanelAction::ProjectExplorer, is_showing, ctx);
                 }
             }
             OpenProjectExplorer => {
-                if *CodeSettings::as_ref(ctx).show_project_explorer {
+                if CodeSettings::as_ref(ctx).project_explorer_enabled() {
                     self.open_left_panel_view(&LeftPanelAction::ProjectExplorer, ctx);
                 }
             }
@@ -26844,7 +26858,7 @@ impl View for Workspace {
             context.set.insert(flags::SHOW_CONVERSATION_HISTORY);
         }
 
-        if *CodeSettings::as_ref(app).show_project_explorer {
+        if CodeSettings::as_ref(app).project_explorer_enabled() {
             context.set.insert(flags::SHOW_PROJECT_EXPLORER);
         }
         if *CodeSettings::as_ref(app).show_global_search {

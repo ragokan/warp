@@ -234,6 +234,14 @@ define_settings_group!(InputSettings,
 );
 
 impl InputSettings {
+    pub fn command_corrections_enabled(&self) -> bool {
+        !cfg!(feature = "lean") && *self.command_corrections.value()
+    }
+
+    pub fn error_underlining_enabled(&self) -> bool {
+        !cfg!(feature = "lean") && *self.error_underlining.value()
+    }
+
     pub fn input_type(&self, app: &AppContext) -> InputBoxType {
         let stored_input_type_value = &self.input_box_type;
 

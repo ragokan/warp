@@ -243,6 +243,9 @@ where
 ///   different affordance (skips Markdown and, when enabled, Jupyter notebooks)
 #[cfg(feature = "local_fs")]
 pub fn should_show_open_in_warp_link(path: &Path, app: &AppContext) -> bool {
+    if cfg!(feature = "lean") {
+        return false;
+    }
     use warpui::SingletonEntity;
 
     use crate::code::view::is_binary_file;

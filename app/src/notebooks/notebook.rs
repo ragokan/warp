@@ -2186,6 +2186,9 @@ impl View for NotebookView {
     }
 
     fn render(&self, app: &AppContext) -> Box<dyn warpui::Element> {
+        if cfg!(feature = "lean") {
+            return warpui::elements::Empty::new().finish();
+        }
         let mut content = Flex::column();
         content.extend(self.render_trash_banner(app));
         content.add_child(self.render_title(app));

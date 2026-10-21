@@ -9,6 +9,12 @@ fn lean_registered_surfaces_exclude_removed_features() {
     App::test((), |mut app| async move {
         crate::test_util::terminal::initialize_app_for_terminal_view(&mut app);
         app.update(|ctx| {
+            use crate::workspace::header_toolbar_item::HeaderToolbarItemKind;
+            assert!(!HeaderToolbarItemKind::CodeReview.is_supported(ctx));
+            assert!(!HeaderToolbarItemKind::ToolsPanel.is_supported(ctx));
+            assert!(!crate::util::tooltips::should_show_open_in_warp_link(
+                std::path::Path::new("/tmp/example.rs"), ctx,
+            ));
             ctx.add_singleton_model(|_| crate::gpu_state::GPUState::new());
             crate::ai::init(ctx);
             crate::code::editor::find::view::init(ctx);
@@ -167,4 +173,49 @@ fn lean_preserves_excluded_toml_values_without_rewriting() {
             .unwrap(),
         Some("true".into())
     );
+}
+
+#[test]
+fn lean_file_and_markdown_links_use_external_targets() {
+    use crate::util::file::external_editor::settings::EditorChoice;
+    use crate::util::openable_file_type::{
+        EditorLayout, FileTarget, resolve_file_target_with_editor_choice,
+    };
+    for path in ["/tmp/example.rs", "/tmp/example.md"] {
+        for choice in [
+            EditorChoice::Warp,
+            EditorChoice::SystemDefault,
+            EditorChoice::EnvEditor,
+        ] {
+            let target = resolve_file_target_with_editor_choice(
+                std::path::Path::new(path),
+                choice,
+                true,
+                EditorLayout::NewTab,
+                None,
+            );
+            assert_eq!(
+                target,
+                if choice == EditorChoice::EnvEditor {
+                    FileTarget::EnvEditor
+                } else {
+                    FileTarget::SystemDefault
+                }
+            );
+        }
+    }
+}
+
+#[test]
+fn lean_disables_legacy_product_contexts() {
+    use warp_core::context_flag::ContextFlag;
+    for flag in [
+        ContextFlag::CreateSharedSession,
+        ContextFlag::RunWorkflow,
+        ContextFlag::LaunchConfigurations,
+        ContextFlag::WarpEssentials,
+        ContextFlag::ShowMCPServers,
+    ] {
+        assert!(!flag.is_enabled(), "{flag:?}");
+    }
 }
