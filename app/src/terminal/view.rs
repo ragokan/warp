@@ -452,7 +452,7 @@ use crate::terminal::model::escape_sequences::{
 };
 use crate::terminal::model::grid::grid_handler::{FragmentBoundary, TermMode};
 use crate::terminal::model::index::{Point, Side};
-use crate::terminal::model::mouse::MouseState;
+use crate::terminal::model::mouse::{MouseButton, MouseState};
 use crate::terminal::model::selection::{SelectAction, SelectionDirection};
 use crate::terminal::model::session::active_session::ActiveSession;
 use crate::terminal::model::session::{
@@ -2599,6 +2599,7 @@ pub struct TerminalView {
     mouse_down_block_index: Option<BlockIndex>,
 
     mouse_states: TerminalViewMouseStates,
+    last_reported_mouse_point: Option<Point>,
 
     server_api: Arc<ServerApi>,
     auth_state: Arc<AuthState>,
@@ -4403,6 +4404,7 @@ impl TerminalView {
             any_session_contains_restored_remote_blocks: false,
             mouse_down_block_index: None,
             mouse_states: Default::default(),
+            last_reported_mouse_point: None,
             open_grid_link_tool_tip: None,
             open_rich_content_link_tool_tip: None,
             server_api: resources.server_api.clone(),
@@ -10035,7 +10037,11 @@ impl TerminalView {
 
         let bytes = data.into();
         let bytes_vec = bytes.to_vec();
-        self.clear_selected_blocks(ctx);
+        if !self.selected_blocks.is_empty() || self.agent_transcript_selection.is_some() {
+            self.clear_selected_blocks(ctx);
+        } else {
+            self.sync_pending_context_block_ids(ctx);
+        }
         self.update_scroll_position_locking(ScrollPositionUpdate::AfterWriteUserBytesToPty, ctx);
         self.write_to_pty(bytes, ctx);
         self.emit_non_editor_typed_event(bytes_vec, ctx);
@@ -12603,7 +12609,7 @@ impl TerminalView {
                 }
             }
             ModelEvent::CursorBlinkingChange(_) => {}
-            ModelEvent::MouseCursorDirty => {}
+            ModelEvent::MouseCursorDirty => self.last_reported_mouse_point = None,
             ModelEvent::Bell => {
                 if *TerminalSettings::as_ref(ctx).use_audible_bell
                     && let Err(e) = AudibleBell::as_ref(ctx).ring()
@@ -13520,6 +13526,7 @@ impl TerminalView {
             }
 
             ModelEvent::TerminalModeSwapped(mode) => {
+                self.last_reported_mouse_point = None;
                 #[cfg(feature = "local_tty")]
                 {
                     let active_command = self
@@ -17160,6 +17167,7 @@ impl TerminalView {
         }
 
         // Update model with new size info.
+        self.last_reported_mouse_point = None;
         self.model.lock().resize(size_update);
         self.find_model.update(ctx, |find_model, ctx| {
             find_model.rerun_find_on_active_grid(ctx);
@@ -18962,6 +18970,15 @@ impl TerminalView {
     }
 
     fn alt_mouse_action(&mut self, mouse_state: &MouseState, ctx: &mut ViewContext<Self>) {
+        // shortcut: assumes cell coords; bypass if SGR-pixels (?1016) is ever added
+        if matches!(
+            mouse_state.button(),
+            MouseButton::Move | MouseButton::LeftDrag
+        ) && mouse_state.maybe_point() == self.last_reported_mouse_point
+        {
+            return;
+        }
+        self.last_reported_mouse_point = mouse_state.maybe_point();
         let escape_sequences = mouse_state
             .to_escape_sequence(self.model.lock().deref())
             .unwrap();
@@ -24506,6 +24523,7 @@ impl TerminalView {
         _evt: &AltScreenReportingChangedEvent,
         ctx: &mut ViewContext<Self>,
     ) {
+        self.last_reported_mouse_point = None;
         ctx.notify();
     }
 

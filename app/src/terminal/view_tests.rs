@@ -761,6 +761,166 @@ fn should_right_click_paste_true_only_without_shift_when_setting_enabled() {
     })
 }
 
+#[test]
+fn pty_write_without_selection_skips_selection_reset() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let changes = Rc::new(RefCell::new(0));
+        let observed = changes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if let Event::SelectedBlocksChanged = event {
+                    *observed.borrow_mut() += 1;
+                }
+            });
+        });
+
+        terminal.update(&mut app, |view, ctx| {
+            let block_id = {
+                let mut model = view.model.lock();
+                model.simulate_block("ls", "foo");
+                model
+                    .block_list()
+                    .blocks()
+                    .iter()
+                    .find(|block| block.command_to_string() == "ls")
+                    .unwrap()
+                    .id()
+                    .clone()
+            };
+            view.ai_context_model.update(ctx, |context, ctx| {
+                context.set_pending_context_block_ids([block_id], false, ctx);
+                assert!(!context.pending_context_block_ids().is_empty());
+            });
+            assert!(view.selected_blocks.is_empty());
+            assert!(view.write_user_bytes_to_pty(b"a".to_vec(), ctx));
+            assert!(
+                view.ai_context_model
+                    .as_ref(ctx)
+                    .pending_context_block_ids()
+                    .is_empty()
+            );
+        });
+        assert_eq!(*changes.borrow(), 0);
+
+        terminal.update(&mut app, |view, ctx| {
+            view.select_less_recent_block(false, ctx);
+            assert!(!view.selected_blocks.is_empty());
+        });
+        *changes.borrow_mut() = 0;
+        terminal.update(&mut app, |view, ctx| {
+            assert!(view.write_user_bytes_to_pty(b"b".to_vec(), ctx));
+            assert!(view.selected_blocks.is_empty());
+        });
+        assert_eq!(*changes.borrow(), 1);
+    })
+}
+
+#[test]
+fn alt_mouse_motion_reports_only_on_cell_change() {
+    use settings::Setting as _;
+
+    use crate::terminal::model::mouse::{MouseAction, MouseButton};
+
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let writes = Rc::new(RefCell::new(Vec::new()));
+        let observed = writes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if let Event::WriteBytesToPty { bytes } = event {
+                    observed.borrow_mut().push(bytes.to_vec());
+                }
+            });
+        });
+        let (flushed_tx, flushed_rx) = async_channel::bounded(1);
+        terminal.update(&mut app, |view, ctx| {
+            ctx.subscribe_to_model(&view.model_events_handle, move |_, _, event, _| {
+                if matches!(event, ModelEvent::Title(title) if title == "mouse-motion-ready") {
+                    flushed_tx.try_send(()).unwrap();
+                }
+            });
+        });
+        terminal.update(&mut app, |view, ctx| {
+            {
+                let mut model = view.model.lock();
+                model.set_mode(ansi::Mode::SwapScreen {
+                    save_cursor_and_clear_screen: true,
+                });
+                model.set_mode(ansi::Mode::SgrMouse);
+                model.set_mode(ansi::Mode::ReportAllMouseMotion);
+            }
+            for (button, col) in [
+                (MouseButton::Move, 3),
+                (MouseButton::Move, 3),
+                (MouseButton::LeftDrag, 3),
+                (MouseButton::Move, 4),
+                (MouseButton::Left, 4),
+            ] {
+                view.alt_mouse_action(
+                    &MouseState::new(button, MouseAction::Pressed, Default::default())
+                        .set_point(Point::new(0, col)),
+                    ctx,
+                );
+            }
+        });
+        assert_eq!(writes.borrow().len(), 3);
+
+        let motion = MouseState::new(MouseButton::Move, MouseAction::Pressed, Default::default())
+            .set_point(Point::new(0, 4));
+        for mode in [
+            ansi::Mode::ReportAllMouseMotion,
+            ansi::Mode::SwapScreen {
+                save_cursor_and_clear_screen: true,
+            },
+        ] {
+            terminal.update(&mut app, |view, _| {
+                let mut model = view.model.lock();
+                if matches!(mode, ansi::Mode::ReportAllMouseMotion) {
+                    model.process_bytes("\x1b[?1003l\x1b[?1003h");
+                } else {
+                    model.unset_mode(mode);
+                    model.set_mode(mode);
+                }
+                // The title marks delivery of all preceding model events to the view.
+                model.process_bytes("\x1b]0;mouse-motion-ready\x07");
+            });
+            flushed_rx.recv().await.unwrap();
+            writes.borrow_mut().clear();
+            terminal.update(&mut app, |view, ctx| {
+                view.alt_mouse_action(&motion, ctx);
+                view.alt_mouse_action(&motion, ctx);
+            });
+            assert_eq!(writes.borrow().len(), 1, "reporting restarted: {mode:?}");
+        }
+
+        for enabled in [false, true] {
+            AltScreenReporting::handle(&app).update(&mut app, |settings, ctx| {
+                settings
+                    .mouse_reporting_enabled
+                    .set_value(enabled, ctx)
+                    .unwrap();
+            });
+        }
+        writes.borrow_mut().clear();
+        terminal.update(&mut app, |view, ctx| {
+            view.alt_mouse_action(&motion, ctx);
+            view.alt_mouse_action(&motion, ctx);
+        });
+        assert_eq!(writes.borrow().len(), 1, "reporting setting restarted");
+
+        writes.borrow_mut().clear();
+        terminal.update(&mut app, |view, ctx| {
+            view.refresh_size(ctx);
+            view.alt_mouse_action(&motion, ctx);
+            view.alt_mouse_action(&motion, ctx);
+        });
+        assert_eq!(writes.borrow().len(), 1, "terminal resized");
+    })
+}
+
 /// Right-clicking a long-running block that owns the mouse (SGR mouse reporting on) must forward
 /// the raw click to the PTY as a mouse report, under both `right_click_behavior` values -- it must
 /// never fall through to Paste or the block list's own context menu.
