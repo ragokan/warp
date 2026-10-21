@@ -223,6 +223,8 @@ where
                     // to the event loop.
                     break;
                 }
+                // EOF with bytes buffered: parse them below, then stop reading.
+                Ok(0) => *can_read = false,
                 // Otherwise, track how many additional bytes we read and move
                 // on to byte processing.
                 Ok(got) => bytes_in_buffer += got,
@@ -242,8 +244,10 @@ where
             let terminal = match &mut terminal {
                 Some(terminal) => terminal,
                 None => terminal.insert(match self.terminal.try_lock() {
-                    // If we've filled up the buffer, block on locking the terminal.
-                    None if bytes_in_buffer >= READ_BUFFER_SIZE => self.terminal.lock(),
+                    // Buffer full, or nothing more to read right now: wait instead of spinning.
+                    None if bytes_in_buffer >= READ_BUFFER_SIZE || !*can_read => {
+                        self.terminal.lock()
+                    }
                     // Otherwise, if we failed to acquire the lock, try to read more
                     // data into the buffer.
                     None => continue,
