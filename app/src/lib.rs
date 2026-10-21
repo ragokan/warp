@@ -3286,3 +3286,7 @@ fn init_logging_for_unit_tests_glue() {
 #[cfg(test)]
 #[path = "lib_tests.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "lean"))]
+#[path = "lean_surface_tests.rs"]
+mod lean_surface_tests;

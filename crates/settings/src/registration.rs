@@ -109,6 +109,9 @@ pub fn register_setting_events<S, C>(
     <S::Group as Entity>::Event: 'static,
     C: GetSingletonModelHandle + AddSingletonModel + UpdateModel,
 {
+    if !warpui_core::lean::setting_is_allowed(S::hierarchy(), S::toml_key()) {
+        return;
+    }
     let serialized_default_value =
         serde_json::to_string(&S::default_value()).expect("default should serialize");
     let file_serialized_default_value = {

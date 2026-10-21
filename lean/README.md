@@ -77,8 +77,11 @@ Every upstream change is gated by `lean`; default upstream behavior is retained.
 | `Cargo.toml` | Stripped release-derived `lean` profile with ThinLTO. |
 | `app/Cargo.toml` | `lean` feature forwards the executor limit to `warpui_core`. |
 | `crates/warpui_core/Cargo.toml` | Adds opt-in `lean` feature. |
+| `crates/warpui_core/src/lean.rs`, `keymap.rs`, `platform/menu.rs`, `crates/warp_core/src/context_flag.rs` | Central lean surface/settings policy, binding/menu filters and disabled legacy contexts. |
+| `crates/settings/src/registration.rs`, `crates/warpui_extras/src/user_preferences/toml_backed.rs` | Excludes hidden settings from registration and prevents writes/deletes without changing the loaded document. |
 | `crates/warpui_core/src/async/native/executor.rs` | Caps the shared background executor at four workers. |
 | `app/src/features.rs` | Final terminal allowlist removes AI, MCP, Oz, cloud agents, sharing, recording, update, changelog and telemetry flags. Existing user-preference precedence pins exclusions off even if server experiments call `set_enabled`. Runtime feature menu is also disabled. |
+| `app/src/settings/input.rs` | Keeps input-style schema copy terminal-focused; both stored styles still persist and sync. |
 | `app/src/settings/ai.rs` | Effective AI availability is always false, including after login; stored choices remain intact. |
 | `app/src/settings/privacy.rs` | Effective privacy snapshot refuses all telemetry and crash/AI collection without overwriting stored or synced choices. |
 | `app/src/drive/settings.rs` | Hides Drive surfaces without disabling settings sync. |

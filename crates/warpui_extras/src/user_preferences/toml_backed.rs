@@ -182,6 +182,9 @@ impl TomlBackedUserPreferences {
 
     /// Returns `true` if writes for the given key are individually inhibited.
     fn is_key_write_inhibited(&self, key: &str, hierarchy: Option<&str>) -> bool {
+        if !warpui_core::lean::setting_is_allowed(hierarchy, key) {
+            return true;
+        }
         let compound = Self::compound_key(key, hierarchy);
         self.write_inhibited_keys.borrow().contains(&compound)
     }

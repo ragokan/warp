@@ -375,6 +375,9 @@ impl PrivacySettings {
 
     /// Fetch the user's privacy settings from the server if any or update the server settings.
     pub fn fetch_or_update_settings(&self, ctx: &mut ModelContext<Self>) {
+        if cfg!(feature = "lean") {
+            return;
+        }
         let auth_client_clone = self.auth_client.clone();
         let _ = ctx.spawn(
             async move { auth_client_clone.get_user_settings().await },
@@ -727,6 +730,9 @@ impl PrivacySettings {
 
     fn handle_warp_drive_objects_loaded(&mut self, _: (), ctx: &mut ModelContext<Self>) {
         self.initialize_default_regexes_once(ctx);
+        if cfg!(feature = "lean") {
+            return;
+        }
         // Check if the warp drive preferences are set. If they are, and telemetry and crash reporting
         // are set as warp drive prefs, then use those.  Otherwise, update the warp drive prefs to match
         // the values from the legacy user_settings endpoint so that we can use warp drive prefs going forward.

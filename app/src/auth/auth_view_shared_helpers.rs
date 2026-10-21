@@ -113,7 +113,11 @@ where
             .with_margin_bottom(AUTH_MODAL_GAP)
             .finish(),
         )
-        .with_child(button)
+        .with_child(if cfg!(feature = "lean") {
+            warpui::elements::Empty::new().finish()
+        } else {
+            button
+        })
         .finish()
 }
 
@@ -423,6 +427,9 @@ pub fn render_privacy_settings_toggles<A: Action + Clone + 'static>(
     actions: &PrivacySettingsActions<A>,
     is_ai_enabled: bool,
 ) -> Box<dyn Element> {
+    if cfg!(feature = "lean") {
+        return warpui::elements::Empty::new().finish();
+    }
     fn render_description(appearance: &Appearance, text: String) -> Box<dyn Element> {
         let disclaimer_styles = UiComponentStyles {
             font_color: Some(

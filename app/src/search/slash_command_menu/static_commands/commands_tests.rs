@@ -68,6 +68,7 @@ fn command_registry_filters_explicit_surface_metadata() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))]
 fn command_registry_contains_commands_for_both_surfaces() {
     let registry = Registry::new();
 
@@ -311,6 +312,7 @@ fn rename_tab_command_requires_argument() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))]
 fn rename_conversation_command_is_active_conversation_scoped_and_requires_argument() {
     let command = COMMAND_REGISTRY
         .get_command_with_name(RENAME_CONVERSATION.name)
@@ -337,6 +339,7 @@ fn rename_conversation_command_is_active_conversation_scoped_and_requires_argume
 
 #[cfg(not(target_family = "wasm"))]
 #[test]
+#[cfg(not(feature = "lean"))]
 fn continue_locally_command_is_registered() {
     let command = COMMAND_REGISTRY
         .get_command_with_name(CONTINUE_LOCALLY.name)
@@ -369,6 +372,7 @@ fn continue_locally_command_is_registered() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))]
 fn set_tab_color_command_requires_argument() {
     let command = COMMAND_REGISTRY
         .get_command_with_name(SET_TAB_COLOR.name)

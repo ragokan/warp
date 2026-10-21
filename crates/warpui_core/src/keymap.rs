@@ -390,7 +390,18 @@ impl Keymap {
     /// These bindings are internal and cannot be changed once they are added
     fn register_fixed_bindings<T: IntoIterator<Item = FixedBinding>>(&mut self, bindings: T) {
         let start_idx = self.fixed_bindings.len();
-        self.fixed_bindings.extend(bindings);
+        self.fixed_bindings
+            .extend(bindings.into_iter().filter(|binding| {
+                binding
+                    .command_description
+                    .as_ref()
+                    .is_none_or(|description| {
+                        crate::lean::surface_is_allowed(
+                            "",
+                            description.in_context(DescriptionContext::Default),
+                        )
+                    })
+            }));
         for binding in &self.fixed_bindings[start_idx..] {
             if matches!(binding.trigger(), Trigger::Custom(_)) {
                 self.fixed_custom_action_bindings.push(binding.clone());
@@ -404,8 +415,17 @@ impl Keymap {
     /// via the `set_custom_trigger` method.
     fn register_editable_bindings<A: IntoIterator<Item = EditableBinding>>(&mut self, actions: A) {
         let start_idx = self.editable_bindings.len();
-        self.editable_bindings
-            .extend(actions.into_iter().map(Tracked::new));
+        self.editable_bindings.extend(
+            actions
+                .into_iter()
+                .filter(|binding| {
+                    crate::lean::surface_is_allowed(
+                        binding.name,
+                        binding.description.in_context(DescriptionContext::Default),
+                    )
+                })
+                .map(Tracked::new),
+        );
         for (idx, binding) in self.editable_bindings.iter().enumerate().skip(start_idx) {
             if matches!(binding.trigger, Trigger::Custom(_)) {
                 self.editable_custom_action_bindings

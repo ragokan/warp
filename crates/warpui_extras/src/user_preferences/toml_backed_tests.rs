@@ -670,7 +670,7 @@ fn test_pretty_print_long_primitive_array_goes_multiline() {
         .map(|i| format!("\"/some/fairly/long/path/entry/number/{i}\""))
         .collect();
     let json = format!("[{}]", items.join(","));
-    let contents = write_and_read_file(Some("agents"), "allowlist", &json, None);
+    let contents = write_and_read_file(Some("terminal"), "allowlist", &json, None);
     assert!(
         contents.contains("allowlist = [\n"),
         "long primitive array should open multi-line, got:\n{contents}"

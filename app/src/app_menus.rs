@@ -102,6 +102,9 @@ fn custom_shortcut(action: CustomAction) -> Option<Keystroke> {
 fn default_name(action: CustomAction, ctx: &AppContext) -> String {
     ctx.description_for_custom_action(action.into(), bindings::MAC_MENUS_CONTEXT)
         .unwrap_or_else(|| {
+            if cfg!(feature = "lean") {
+                return String::new();
+            }
             debug_assert!(false, "action should have a name: {action:?}");
             "<NO DESCRIPTION>".into()
         })

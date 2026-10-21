@@ -157,6 +157,11 @@ impl TipsView {
             ),
         ];
 
+        let tip_items: Vec<_> = tip_items
+            .into_iter()
+            .filter(|tip| warpui::lean::surface_is_allowed(&tip.editable_binding_name, &tip.title))
+            .collect();
+
         // Initialize the action target cache. This will be updated when the tip menu is opened
         let action_target = ctx.add_model(|_| ActionTarget::None);
 

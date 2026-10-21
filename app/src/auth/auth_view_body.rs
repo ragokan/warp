@@ -353,6 +353,9 @@ impl AuthViewBody {
         .with_margin_bottom(8.)
         .finish();
 
+        if cfg!(feature = "lean") {
+            return vec![disclaimer_line_1];
+        }
         let disclaimer_line_2 = if FeatureFlag::GlobalAIAnalyticsBanner.is_enabled() {
             Align::new(
                 ui_builder
@@ -593,6 +596,9 @@ impl AuthViewBody {
         appearance: &Appearance,
         ui_builder: &UiBuilder,
     ) -> Box<dyn Element> {
+        if cfg!(feature = "lean") {
+            return warpui::elements::Empty::new().finish();
+        }
         let disclaimer_color = appearance
             .theme()
             .sub_text_color(appearance.theme().background())

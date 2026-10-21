@@ -1495,6 +1495,15 @@ pub enum MenuItem<A: Action + Clone = ()> {
 }
 
 impl<A: Action + Clone> MenuItem<A> {
+    fn is_allowed_in_lean(&self) -> bool {
+        match self {
+            Self::Item(fields) | Self::Submenu { fields, .. } | Self::Header { fields, .. } => {
+                warpui::lean::surface_is_allowed("", fields.label())
+            }
+            Self::Separator | Self::ItemsRow { .. } => true,
+        }
+    }
+
     #[deprecated(note = "Submenus are not ready for use yet.")]
     pub fn submenu<T: Into<String>>(label: T, items: Vec<MenuItem<A>>) -> Self {
         let menu = SubMenu::new(items);
@@ -1788,6 +1797,7 @@ pub enum Event {
 
 impl<A: Action + Clone> SubMenu<A> {
     pub fn new(mut items: Vec<MenuItem<A>>) -> Self {
+        items.retain(MenuItem::is_allowed_in_lean);
         Self::increment_depth(&mut items);
         Self {
             depth: 0,
@@ -2407,18 +2417,25 @@ impl<A: Action + Clone> Menu<A> {
         items: impl IntoIterator<Item = MenuItem<A>>,
         ctx: &mut ViewContext<Self>,
     ) {
-        self.menu.items = items.into_iter().collect();
+        self.menu.items = items
+            .into_iter()
+            .filter(MenuItem::is_allowed_in_lean)
+            .collect();
         // No need to ctx.notify, since reset_selection will.
         self.reset_selection(ctx);
     }
 
     #[allow(dead_code)]
     pub fn add_item(&mut self, item: MenuItem<A>) {
-        self.menu.items.push(item);
+        if item.is_allowed_in_lean() {
+            self.menu.items.push(item);
+        }
     }
 
     pub fn add_items(&mut self, items: impl IntoIterator<Item = MenuItem<A>>) {
-        self.menu.items.extend(items);
+        self.menu
+            .items
+            .extend(items.into_iter().filter(MenuItem::is_allowed_in_lean));
     }
 
     pub fn reset_selection(&mut self, ctx: &mut ViewContext<Self>) {

@@ -294,7 +294,11 @@ pub const ADD_RULE: StaticCommand = StaticCommand {
 
 pub static EDIT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     name: "/open-file",
-    description: "Open a file in Warp's code editor",
+    description: if cfg!(feature = "lean") {
+        "Open a file using your external editor"
+    } else {
+        "Open a file in Warp's code editor"
+    },
     kind: SlashCommandKind::Edit,
     supported_surfaces: SlashCommandSurfaces::GuiOnly {
         icon_path: "bundled/svg/file-code-02.svg",
@@ -924,7 +928,10 @@ impl Default for Registry {
 impl Registry {
     pub fn new() -> Self {
         let mut commands = HashMap::new();
-        for command in all_commands_for_all_surfaces() {
+        for command in all_commands_for_all_surfaces()
+            .into_iter()
+            .filter(|command| warpui::lean::slash_is_allowed(command.name))
+        {
             debug_assert!(
                 !command
                     .availability

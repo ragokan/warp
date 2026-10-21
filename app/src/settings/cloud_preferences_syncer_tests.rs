@@ -287,6 +287,7 @@ fn expect_bulk_create_generic_string_objects(
 }
 
 #[test]
+#[cfg(not(feature = "lean"))]
 fn test_sync_local_pref_to_cloud_after_initial_sync_creates_prefs_setting() {
     App::test(ASSETS, |mut app| async move {
         initialize_settings(&mut app);
@@ -333,6 +334,7 @@ fn test_sync_local_pref_to_cloud_after_initial_sync_creates_prefs_setting() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))]
 fn test_sync_local_pref_to_cloud_after_initial_sync() {
     App::test(ASSETS, |mut app| async move {
         initialize_settings(&mut app);
@@ -594,16 +596,19 @@ fn run_initial_sync_test(is_onboarded: bool) {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))]
 fn test_sync_local_pref_to_cloud_on_initial_sync_for_first_time_user() {
     run_initial_sync_test(false);
 }
 
 #[test]
+#[cfg(not(feature = "lean"))]
 fn test_sync_local_pref_to_cloud_on_initial_sync_for_returning_user() {
     run_initial_sync_test(true);
 }
 
 #[test]
+#[cfg(not(feature = "lean"))]
 fn test_sync_local_pref_to_cloud_updates_existing_pref() {
     App::test(ASSETS, |mut app| async move {
         initialize_settings(&mut app);
@@ -691,6 +696,7 @@ fn test_sync_local_pref_to_cloud_updates_existing_pref() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))]
 fn test_sync_cloud_pref_to_local_on_initial_load_or_collab_update() {
     App::test(ASSETS, |mut app| async move {
         initialize_settings(&mut app);
@@ -806,6 +812,7 @@ fn test_sync_cloud_pref_to_local_on_initial_load_or_collab_update() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))]
 fn test_cloud_preferences_setting_initial_load_skipped_when_setting_is_off() {
     App::test(ASSETS, |mut app| async move {
         initialize_settings(&mut app);
@@ -931,6 +938,7 @@ fn test_cloud_preferences_setting_initial_load_skipped_when_setting_is_off() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))]
 fn test_sync_local_pref_to_cloud_doesnt_update_equal_pref() {
     App::test(ASSETS, |mut app| async move {
         initialize_settings(&mut app);
@@ -1035,6 +1043,7 @@ fn test_sync_local_pref_to_cloud_doesnt_update_equal_pref() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))]
 fn test_cloud_preferences_setting_enabling_setting_syncs_prefs() {
     App::test(ASSETS, |mut app| async move {
         // Start with cloud prefs disabled
@@ -1096,6 +1105,7 @@ fn test_cloud_preferences_setting_enabling_setting_syncs_prefs() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))]
 fn test_cloud_pref_not_synced_when_current_value_not_syncable() {
     App::test(ASSETS, |mut app| async move {
         initialize_settings(&mut app);
@@ -1158,6 +1168,7 @@ fn test_cloud_pref_not_synced_when_current_value_not_syncable() {
 }
 
 #[test]
+#[cfg(not(feature = "lean"))]
 fn test_ensure_no_duplicate_cloud_prefs() {
     App::test(ASSETS, |mut app| async move {
         initialize_settings(&mut app);
@@ -1755,4 +1766,215 @@ fn test_offline_ui_change_does_not_update_hash_until_sync_succeeds() {
             "stored hash should match new file after successful upload",
         );
     })
+}
+
+#[cfg(feature = "lean")]
+mod lean_preservation {
+    use super::*;
+
+    #[test]
+    fn lean_fresh_returning_device_applies_cloud_without_uploading() {
+        App::test(ASSETS, |mut app| async move {
+            initialize_settings(&mut app);
+            assert!(!TestSettings::handle(&app).read(&app, |settings, _| {
+                *settings.all_platforms_cloud_setting.value()
+            }));
+            let fake = FakeObjectClient::default();
+            fake.seed_preference("AllPlatforms", "true", Platform::Global);
+            fake.seed_preference("IsSettingsSyncEnabled", "true", Platform::Global);
+            let secret_regexes: Vec<_> =
+                crate::terminal::model::secrets::regexes::DEFAULT_REGEXES_WITH_NAMES
+                    .iter()
+                    .map(
+                        |regex| serde_json::json!({ "name": regex.name, "pattern": regex.pattern }),
+                    )
+                    .collect();
+            fake.seed_preference(
+                "CustomSecretRegexList",
+                &serde_json::to_string(&secret_regexes).unwrap(),
+                Platform::Global,
+            );
+            let UpdateManagerStruct { update_manager, .. } =
+                create_update_manager_struct(&mut app, Arc::new(fake.clone()));
+            app.add_singleton_model(|ctx| {
+                let mut syncer = CloudPreferencesSyncer::new(false, Default::default(), true, ctx);
+                let auth_state = AuthState::new_for_test();
+                auth_state.set_is_onboarded(true);
+                syncer.handle_user_fetched(Arc::new(auth_state), ctx);
+                syncer
+            });
+            update_manager.update(&mut app, |manager, ctx| {
+                manager.mock_initial_load(fake.snapshot_as_initial_load_response(), ctx);
+            });
+            drain_sync_queue(&mut app).await;
+            assert!(
+                CloudPreferencesSyncer::handle(&app)
+                    .read(&app, |syncer, _| { syncer.has_completed_initial_load })
+            );
+            assert!(TestSettings::handle(&app).read(&app, |settings, _| {
+                *settings.all_platforms_cloud_setting.value()
+            }));
+            assert!(app.read(|ctx| *CloudPreferencesSettings::as_ref(ctx).settings_sync_enabled));
+            assert_num_spawned_futures(&mut app, 0, "fresh device re-uploaded cloud preferences");
+            assert!(SyncQueue::handle(&app).read(&app, |queue, _| queue.queue().is_empty()));
+        });
+    }
+
+    #[test]
+    fn lean_sync_uploads_applies_cloud_changes_and_skips_equal_values() {
+        use crate::server::server_api::object::ObjectClient;
+        use crate::server::sync_queue::SerializedModel;
+
+        App::test(ASSETS, |mut app| async move {
+            initialize_settings(&mut app);
+            enable_settings_sync(&mut app);
+            let fake = FakeObjectClient::default();
+            let id = fake.seed_preference("AllPlatforms", "false", Platform::Global);
+            let UpdateManagerStruct { update_manager, .. } =
+                create_update_manager_struct(&mut app, Arc::new(fake.clone()));
+            app.add_singleton_model(|ctx| {
+                let syncer = CloudPreferencesSyncer::new(false, Default::default(), true, ctx);
+                syncer.sync(ForceCloudToMatchLocal::No, ctx);
+                syncer
+            });
+            update_manager.update(&mut app, |manager, ctx| {
+                manager.mock_initial_load(fake.snapshot_as_initial_load_response(), ctx);
+            });
+            drain_sync_queue(&mut app).await;
+
+            TestSettings::handle(&app).update(&mut app, |settings, ctx| {
+                settings
+                    .all_platforms_cloud_setting
+                    .set_value(true, ctx)
+                    .unwrap();
+            });
+            drain_sync_queue(&mut app).await;
+            assert_eq!(
+                fake.cloud_value("AllPlatforms", Platform::Global)
+                    .as_deref(),
+                Some("true")
+            );
+
+            fake.update_generic_string_object(
+                id.into(),
+                SerializedModel::new(
+                    r#"{"storage_key":"AllPlatforms","value":false,"platform":"Global"}"#.into(),
+                ),
+                None,
+            )
+            .await
+            .unwrap();
+            update_manager.update(&mut app, |manager, ctx| {
+                manager.mock_initial_load(fake.snapshot_as_initial_load_response(), ctx);
+            });
+            drain_sync_queue(&mut app).await;
+            assert!(!TestSettings::handle(&app).read(&app, |settings, _| {
+                *settings.all_platforms_cloud_setting.value()
+            }));
+
+            let cloud_revision = || {
+                fake.snapshot_as_initial_load_response()
+                    .updated_generic_string_objects
+                    .values()
+                    .flatten()
+                    .find_map(|object| {
+                        object
+                            .as_any()
+                            .downcast_ref::<ServerPreference>()
+                            .filter(|preference| preference.id == SyncId::ServerId(id))
+                            .map(|preference| preference.metadata.revision)
+                    })
+                    .unwrap()
+            };
+            let before = cloud_revision();
+            let expected_requests =
+                SyncQueue::handle(&app).read(&app, |queue, _| queue.spawned_futures().len());
+            CloudPreferencesSyncer::handle(&app).update(&mut app, |syncer, ctx| {
+                syncer
+                    .maybe_sync_local_prefs_to_cloud(vec![AllPlatforms::storage_key().into()], ctx);
+            });
+            assert_num_spawned_futures(&mut app, expected_requests, "equal preference queued work");
+            drain_sync_queue(&mut app).await;
+            assert_num_spawned_futures(
+                &mut app,
+                expected_requests,
+                "equal preference spawned work",
+            );
+            assert!(SyncQueue::handle(&app).read(&app, |queue, _| queue.queue().is_empty()));
+            assert_eq!(
+                before,
+                cloud_revision(),
+                "equal preference was uploaded again"
+            );
+        });
+    }
+
+    define_settings_group!(LeanPreservedSettings, settings: [
+        preserved: LeanPreservedAgentPreference {
+            type: bool,
+            default: false,
+            supported_platforms: SupportedPlatforms::ALL,
+            sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
+            surface: settings::SettingSurfaces::GUI,
+            private: false,
+            toml_path: "agents.preservation_test",
+        },
+    ]);
+
+    #[test]
+    #[cfg(feature = "lean")]
+    fn lean_excluded_preference_survives_sync_and_duplicate_cleanup() {
+        App::test(ASSETS, |mut app| async move {
+            initialize_settings(&mut app);
+            LeanPreservedSettings::register(&mut app);
+            enable_settings_sync(&mut app);
+            LeanPreservedSettings::handle(&app).update(&mut app, |settings, ctx| {
+                settings.preserved.set_value(true, ctx).unwrap();
+            });
+            let UpdateManagerStruct { update_manager, .. } = create_update_manager_struct(
+                &mut app,
+                Arc::new(crate::server::cloud_objects::test_utils::mock_server_api()),
+            );
+            app.update(|ctx| {
+            update_manager.update(ctx, |manager, ctx| {
+                manager.mock_initial_load(initial_load_response_with_cloud_settings(
+                    [123, 456].into_iter().map(|id| SettingToLoad {
+                        id: id.into(),
+                        serialized_preference: r#"{"storage_key":"LeanPreservedAgentPreference","value":false,"platform":"Global"}"#.into(),
+                    }).collect(),
+                ), ctx);
+            });
+        });
+            app.add_singleton_model(|ctx| {
+                let key = LeanPreservedAgentPreference::storage_key();
+                assert!(
+                    crate::settings::manager::SettingsManager::as_ref(ctx)
+                        .cloud_syncing_mode_for_storage_key(key)
+                        .is_none()
+                );
+                let mut syncer = CloudPreferencesSyncer::new_for_test(
+                    ctx,
+                    Arc::new(TestClientIdProvider::new(vec![])),
+                );
+                syncer.ensure_no_duplicate_cloud_prefs(ctx);
+                syncer.maybe_sync_cloud_pref_to_local(key, ctx);
+                syncer.maybe_sync_local_prefs_to_cloud(vec![key.into()], ctx);
+                assert!(*LeanPreservedAgentPreference::new_from_storage(ctx).value());
+                let cloud = crate::cloud_object::model::persistence::CloudModel::as_ref(ctx);
+                let preferences: Vec<_> = cloud
+                    .get_all_objects_of_type::<GenericStringObjectId, CloudPreferenceModel>()
+                    .collect();
+                assert_eq!(preferences.len(), 2);
+                assert!(preferences.iter().all(|preference| {
+                    !preference.metadata.pending_changes_statuses.pending_delete
+                        && preference.model().string_model.value == serde_json::json!(false)
+                }));
+                assert!(
+                    SyncQueue::as_ref(ctx).spawned_futures().is_empty(),
+                    "excluded keys queued cloud work"
+                );
+                syncer
+            });
+        });
+    }
 }

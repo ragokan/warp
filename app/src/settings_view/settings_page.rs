@@ -637,6 +637,9 @@ pub fn render_info_icon<T: Clone + Action>(
     appearance: &Appearance,
     additional_info: AdditionalInfo<T>,
 ) -> Box<dyn Element> {
+    if cfg!(feature = "lean") && additional_info.on_click_action.is_some() {
+        return Empty::new().finish();
+    }
     let tooltip_text = additional_info
         .tooltip_override_text
         .unwrap_or("Click to learn more in docs".to_owned());
@@ -1569,6 +1572,10 @@ impl<V: warpui::View> PageType<V> {
         widgets: Vec<Box<dyn SettingsWidget<View = V>>>,
         title: Option<PageTitle<V>>,
     ) -> Self {
+        let widgets: Vec<_> = widgets
+            .into_iter()
+            .filter(|widget| warpui::lean::widget_is_allowed(widget.widget_id()))
+            .collect();
         Self::Uncategorized {
             filter: widgets.iter().enumerate().map(|(i, _)| i).collect(),
             widgets,
@@ -1585,6 +1592,15 @@ impl<V: warpui::View> PageType<V> {
         categories: Vec<Category<V>>,
         title: Option<PageTitle<V>>,
     ) -> Self {
+        let categories: Vec<_> = categories
+            .into_iter()
+            .filter_map(|mut category| {
+                category
+                    .widgets
+                    .retain(|widget| warpui::lean::widget_is_allowed(widget.widget_id()));
+                (!category.widgets.is_empty() || !cfg!(feature = "lean")).then_some(category)
+            })
+            .collect();
         Self::Categorized {
             filter: categories
                 .iter()

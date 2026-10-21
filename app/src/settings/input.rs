@@ -26,6 +26,7 @@ pub const MAX_TIMES_TO_SHOW_AUTOSUGGESTION_HINT: i8 = 2;
 #[schemars(description = "Terminal input style.", rename_all = "snake_case")]
 pub enum InputBoxType {
     /// AI-first input
+    #[cfg_attr(feature = "lean", schemars(description = "Warp input"))]
     Universal,
 
     #[default]

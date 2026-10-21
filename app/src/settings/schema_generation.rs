@@ -24,13 +24,16 @@ pub fn dump_settings_schema(output_path: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
-fn settings_schema_json(is_flag_enabled: impl Fn(FeatureFlag) -> bool) -> Result<String> {
+pub(crate) fn settings_schema_json(
+    is_flag_enabled: impl Fn(FeatureFlag) -> bool,
+) -> Result<String> {
     let mut generator = SchemaGenerator::default();
     let mut root_properties = Map::new();
     let mut entry_count = 0;
 
     for entry in inventory::iter::<SettingSchemaEntry> {
-        if entry.is_private {
+        if entry.is_private || !warpui::lean::setting_is_allowed(entry.hierarchy, entry.storage_key)
+        {
             continue;
         }
 

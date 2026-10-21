@@ -2291,6 +2291,9 @@ impl AISettings {
     }
 
     pub fn default_session_mode(&self, app: &AppContext) -> DefaultSessionMode {
+        if cfg!(feature = "lean") {
+            return DefaultSessionMode::Terminal;
+        }
         let mode = *self.default_session_mode_internal.value();
         match mode {
             // Terminal and TabConfig don't require AI.

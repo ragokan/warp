@@ -533,6 +533,11 @@ impl CloudPreferencesSyncer {
            let pref_ids = prefs_by_storage_key
                 .iter()
                 .filter_map(|(storage_key, prefs)| {
+                    if cfg!(feature = "lean") && SettingsManager::as_ref(ctx)
+                        .cloud_syncing_mode_for_storage_key(storage_key).is_none()
+                    {
+                        return None;
+                    }
                     if prefs.len() == 1 {
                         return None;
                     }

@@ -12,6 +12,19 @@ pub enum MenuItem {
     Services,
 }
 
+impl MenuItem {
+    fn is_allowed_in_lean(&self) -> bool {
+        match self {
+            Self::Custom(item) => {
+                !cfg!(feature = "lean")
+                    || (!item.properties.name.is_empty()
+                        && crate::lean::surface_is_allowed("", &item.properties.name))
+            }
+            _ => true,
+        }
+    }
+}
+
 // We allow dead_code here because the title is only read when compiling the
 // Mac bits.
 #[allow(dead_code)]
@@ -24,7 +37,10 @@ impl Menu {
     pub fn new<S: Into<String>>(title: S, menu_items: Vec<MenuItem>) -> Self {
         Menu {
             title: title.into(),
-            menu_items,
+            menu_items: menu_items
+                .into_iter()
+                .filter(MenuItem::is_allowed_in_lean)
+                .collect(),
         }
     }
 
@@ -40,7 +56,19 @@ pub struct MenuBar {
 
 impl MenuBar {
     pub fn new(menus: Vec<Menu>) -> Self {
-        MenuBar { menus }
+        MenuBar {
+            menus: menus
+                .into_iter()
+                .filter(|menu| {
+                    crate::lean::surface_is_allowed("", &menu.title)
+                        && (!crate::lean::IS_LEAN
+                            || menu
+                                .menu_items
+                                .iter()
+                                .any(|item| !matches!(item, MenuItem::Separator)))
+                })
+                .collect(),
+        }
     }
 }
 
@@ -91,7 +119,12 @@ impl MenuItemPropertyChanges {
             keystroke: Some(props.keystroke),
             disabled: Some(props.disabled),
             checked: Some(props.checked),
-            submenu: Some(submenu),
+            submenu: Some(submenu.map(|items| {
+                items
+                    .into_iter()
+                    .filter(MenuItem::is_allowed_in_lean)
+                    .collect()
+            })),
         }
     }
 }
@@ -162,7 +195,12 @@ impl CustomMenuItem {
             },
             callback: Box::new(callback),
             updater: Box::new(updater),
-            submenu: Some(submenu),
+            submenu: Some(
+                submenu
+                    .into_iter()
+                    .filter(MenuItem::is_allowed_in_lean)
+                    .collect(),
+            ),
         }
     }
 }

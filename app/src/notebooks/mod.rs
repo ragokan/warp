@@ -195,6 +195,9 @@ impl From<Owner> for NotebookLocation {
 
 /// Initialize notebooks-related keybindings.
 pub fn init(app: &mut AppContext) {
+    if cfg!(feature = "lean") {
+        return;
+    }
     self::notebook::init(app);
     self::file::init(app);
     self::editor::view::init(app);
