@@ -23,7 +23,9 @@ import re
 import sys
 
 tag = os.environ.get("GIT_RELEASE_TAG", "development")
-match = re.fullmatch(r"lean-v(\d+\.\d+\.\d+)(?:[-+].*)?", tag)
+match = re.fullmatch(r"lean-v(\d+\.\d+\.\d+)(?:[-+].+)?", tag)
+if os.environ.get("GITHUB_REF_TYPE") == "tag" and match is None:
+    raise SystemExit(f"Invalid lean release tag: {tag}")
 version = match[1] if match else "0.1.0"
 with open(sys.argv[1], "wb") as stream:
     plistlib.dump({
@@ -74,9 +76,14 @@ otool -L "$contents/MacOS/warp-oss"
 python3 lean/ci/verify-bundle.py macos "$app"
 
 ditto -c -k --keepParent "$app" "$output/lean-warp-macos-arm64.zip"
+extracted="$stage/extracted"
+mkdir "$extracted"
+ditto -x -k "$output/lean-warp-macos-arm64.zip" "$extracted"
+python3 lean/ci/verify-bundle.py macos "$extracted/WarpOss.app"
+codesign --verify --deep --strict --verbose=2 "$extracted/WarpOss.app"
 disk="$stage/disk"
 mkdir "$disk"
-cp -R "$app" "$disk/"
+ditto "$app" "$disk/WarpOss.app"
 ln -s /Applications "$disk/Applications"
 hdiutil create -volname WarpOss -srcfolder "$disk" -ov -format UDZO \
   "$output/lean-warp-macos-arm64.dmg"

@@ -1,7 +1,10 @@
 import importlib.util
+import os
 from pathlib import Path
 import plistlib
 import struct
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -11,6 +14,32 @@ spec.loader.exec_module(bundle)
 
 
 class VerifyBundleTests(unittest.TestCase):
+    def test_macos_plist_release_version(self):
+        source = Path(__file__).with_name("bundle-macos.sh").read_text()
+        generator = source.split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
+        for ref_type, tag, version in (
+            ("branch", "lean-ci", "0.1.0"),
+            ("tag", "lean-v1.2.3", "1.2.3"),
+            ("tag", "lean-v1.2.3-rc.1", "1.2.3"),
+            ("tag", "lean-v1.2.3+build.1", "1.2.3"),
+            ("tag", "lean-vbad", None),
+            ("tag", "lean-v1.2", None),
+            ("tag", "lean-v1.2.3-", None),
+        ):
+            with self.subTest(tag=tag), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "Info.plist"
+                result = subprocess.run(
+                    [sys.executable, "-", str(path)], input=generator, text=True,
+                    capture_output=True,
+                    env=dict(os.environ, GITHUB_REF_TYPE=ref_type, GIT_RELEASE_TAG=tag),
+                )
+                if version is None:
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertFalse(path.exists())
+                else:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(plistlib.loads(path.read_bytes())["CFBundleVersion"], version)
+
     def test_macos_package_rejects_wrong_arch_and_bundle_identifier(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -101,6 +130,11 @@ class VerifyBundleTests(unittest.TestCase):
             (resources / "settings_schema.json").write_text("{}")
             system = "libc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x1234)"
             bundle.verify("linux", root, system)
+            for marker in (b"lean-ci", b"lean-v1.2.3"):
+                binary.write_bytes(header + marker)
+                with self.subTest(marker=marker), self.assertRaisesRegex(AssertionError, "release marker"):
+                    bundle.verify("linux", root, system)
+            binary.write_bytes(header)
             for invalid in (entry.replace("warposs", "warp"), entry.split("MimeType")[0]):
                 desktop.write_text(invalid)
                 with self.assertRaises(AssertionError):

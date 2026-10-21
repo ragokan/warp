@@ -3,6 +3,9 @@
 `lean-release.yml` builds on `lean-ci` pushes and `lean-v*` tag pushes. Both
 platforms upload artifacts for 14 days. Only `lean-v*` tags create a **draft**
 GitHub Release, after both builds pass. No release is created on branch pushes.
+There is no `workflow_dispatch` trigger: a release tag must point to a commit
+containing this workflow. Tags must use `lean-vX.Y.Z` with an optional nonempty
+`-prerelease` or `+build` suffix; malformed tags fail packaging.
 
 The **Build production lean binary** step runs `lean/build.sh`, which builds
 `warp-oss` with `--no-default-features`, an explicit terminal feature list, and
@@ -11,6 +14,15 @@ codegen units, no debug symbols, and stripped symbols. CI has no profile
 overrides; branch tests and tagged releases use the same production build.
 Packaging accepts the binary path printed by the build script. It does not
 invoke the private channel config installer or use Warp secrets.
+`GIT_RELEASE_TAG` is set only during packaging, for the plist and bundled
+`version.json`; it is unset during compilation. Archive verification uses
+`strings -a` to reject embedded `lean-ci` or `lean-v<digit>` version markers.
+Both archives are extracted into fresh directories and verified in CI; the
+extracted macOS app also passes signature verification.
+
+The Oz and skill documentation under `resources/bundled/skills` is inert in the
+lean build. It remains bundled with the other resources; verification requires
+the `bundled/` directory.
 
 Workflows introduced by a future upstream sync can arrive enabled. After each
 sync, list all workflows and disable newly introduced upstream workflows,

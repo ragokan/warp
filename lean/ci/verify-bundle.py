@@ -7,6 +7,7 @@ from pathlib import Path
 import plistlib
 import re
 import struct
+import subprocess
 
 
 def verify(platform, root, ldd=None):
@@ -75,6 +76,10 @@ def verify(platform, root, ldd=None):
     assert (resources / "THIRD_PARTY_LICENSES.txt").stat().st_size > 0
     with (resources / "settings_schema.json").open() as stream:
         assert isinstance(json.load(stream), dict), "Expected settings schema object"
+    strings = subprocess.check_output(["strings", "-a", str(binary)])
+    markers = sum(bool(re.search(rb"lean-(ci|v[0-9])", line)) for line in strings.splitlines())
+    print(f"Lean release markers in binary: {markers}")
+    assert markers == 0, "Lean release marker embedded in binary"
     print(f"Verified {platform} arm64 package: {root}")
 
 
