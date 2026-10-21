@@ -159,6 +159,12 @@ static void activate_app_and_focus_window(NSWindow *window) {
     }
 }
 
+- (void)windowDidChangeOcclusionState:(NSNotification *)notification {
+    NSWindow *window = notification.object;
+    [(WarpHostView *)window.contentView
+        setOccluded:!(window.occlusionState & NSWindowOcclusionStateVisible)];
+}
+
 - (void)windowWillStartLiveResize:(NSNotification *)notification {
     WarpWindow *warp_window = notification.object;
     WarpHostView *warp_view = warp_window.contentView;

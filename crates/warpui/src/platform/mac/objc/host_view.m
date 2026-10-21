@@ -44,6 +44,9 @@ void warp_marked_text_cleared(WarpHostView *);
     // Whether we are in test mode, which suppresses drawing.
     BOOL testMode;
 
+    // Set only by occlusion notifications; new windows report visibility late.
+    BOOL occluded;
+
     // The metal device for our layer.
     id metalDevice;
 
@@ -145,9 +148,14 @@ void warp_marked_text_cleared(WarpHostView *);
 }
 
 - (void)displayLayer:(CALayer *)layer {
-    if (!testMode && self.readyForWarp) {
+    if (!testMode && self.readyForWarp && !occluded) {
         warp_update_layer(self);
     }
+}
+
+- (void)setOccluded:(BOOL)isOccluded {
+    occluded = isOccluded;
+    if (!occluded) [self setNeedsDisplay:YES];
 }
 
 - (void)setAsyncCallback:(BOOL)shouldAsync {
