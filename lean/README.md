@@ -61,8 +61,12 @@ Login therefore needs its own browser callback. The fixed loopback HTTP server i
 installation detection and profiling; authentication uses the registered URL scheme.
 
 Settings sync remains enabled when the copied `account.is_settings_sync_enabled`
-setting is true. The Account page exposes it after login. The cloud-object connection and
-settings syncer are retained; hiding the Warp Drive UI does not disable that connection.
+setting is true. The Account page exposes it after login. Preference startup fetches, the 600-second poll with 20% jitter and uploads remain. The
+cloud-object websocket is disabled; workspace metadata keeps initial/on-demand fetches only.
+Other-device changes arrive within about 10–12 minutes. There is no catch-up refresh after
+wake from sleep; network-online events still trigger a poll. Sync uses last-write-wins: a local
+edit shortly after another device edits the same key can be overwritten at the next poll.
+Workspace/enterprise metadata refreshes only at startup or on demand.
 
 Turning Settings sync off and then on uses upstream `ForceCloudToMatchLocal`: cloud settings
 are overwritten with this lean installation's local values. The first install copied the

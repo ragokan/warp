@@ -301,6 +301,9 @@ impl Listener {
     }
 
     fn get_warp_drive_updates(&mut self, ctx: &mut ModelContext<Self>) {
+        if cfg!(feature = "lean") {
+            return;
+        }
         let object_client = self.cloud_objects_client.clone();
         let (message_sender, message_receiver) = async_channel::unbounded();
         let subscription_ready_tx = self.subscription_ready_tx.clone();
