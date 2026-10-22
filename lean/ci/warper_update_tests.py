@@ -355,7 +355,7 @@ class LinuxUpdateTests(UpdateTests):
         """Runs a real executable from the installed path, as the running Warper does."""
         binary = self.app / "warp-oss"
         binary.unlink()
-        shutil.copy2(shutil.which("sleep"), binary)
+        shutil.copy(shutil.which("sleep"), binary)  # copy2 would copy macOS's restricted file flag
         running = subprocess.Popen([str(binary), "300"])
         self.addCleanup(running.kill)
         time.sleep(0.5)
