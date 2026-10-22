@@ -140,7 +140,8 @@ close). On yes the script starts a detached relauncher that sends no signal: it 
 for Warper's process to exit, then starts the new version, and Warper quits through its normal
 shutdown, so the usual state save runs. It skips the "Quit Warp?" dialog, because you just
 confirmed; unsaved code changes still raise it. If Warper never exits (say, you cancel that
-dialog) the relauncher gives up silently. Answer no and the update applies the next time you
+dialog) the relauncher gives up silently (on Linux it still deletes the hidden old binary once
+Warper exits). Answer no and the update applies the next time you
 launch it. The tab hands Warper's PID to the script, so run from another terminal the script just
 installs.
 
@@ -149,9 +150,12 @@ installs.
   copy without `warp-oss` is refused. It stages the whole new install beside it, swaps the pieces
   with renames and puts the old ones back if any step fails. Once the new install is in place the
   old files are deleted, so no previous copy remains (a `warp-oss.previous` left by an older
-  updater is removed too; a running Warper keeps working from its open files). If it cannot
-  restore them it leaves them in the hidden `.warper-update.*` folder next to the install and
-  prints the path. If an update is interrupted (a SIGKILL or power loss between the renames), the
+  updater is removed too). Linux keeps the old binary, hidden as `.warp-oss.old` inside the
+  install, only until the old Warper exits, so that Warper still finds the new resources and
+  updater through its own path; a detached waiter deletes it when that PID is gone (a run from
+  another terminal has no PID and leaves it for the next update to replace). If it cannot
+  restore the old files it leaves them in the hidden `.warper-update.*` folder next to the
+  install and prints the path. If an update is interrupted (a SIGKILL or power loss between the renames), the
   previous files are in that folder; move them back. The script finds its install through
   symlinks too. `VERSION` comes
   from the release tag: the release archive ships it and `lean/install-linux.sh` copies it, but
@@ -159,7 +163,8 @@ installs.
   (built from source)".
 - macOS: replaces the running `Warper.app` in place, without sudo. The old app waits in the
   hidden `.warper-update.*` folder beside it until the new one is in place (and is moved back if
-  that fails), then it is deleted, together with a `Warper.previous.app` left by an older updater.
+  that fails; if even that fails the folder is kept and named), then it is deleted, together with
+  a `Warper.previous.app` left by an older updater.
   If the app's folder is not writable it says so and stops. The installed version is the bundle's
   `CFBundleShortVersionString`.
 

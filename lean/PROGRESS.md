@@ -1,5 +1,11 @@
 # Lean build progress
 
+## 2026-10-22 — updater: keep the running Linux binary resolvable, keep the macOS recovery copy
+
+- Review of the previous commit: on Linux, deleting the old binary made `/proc/self/exe` read `<stage>/old/warp-oss (deleted)`, and `current_exe()` callers (updater script lookup, `bundled_resources_dir`, ripgrep self re-exec, crash recovery) failed in the old Warper until it restarted. Now the old binary is renamed to `$app/.warp-oss.old` inside the install, so its parent is still the new install; a detached helper (own session, `kill -0` only) deletes it when the old PID exits. With a restart it does so before starting the new binary; without one it waits indefinitely; without `WARPER_PID` the file stays and the next update replaces it. The rest of the stage is still deleted at once. macOS is unaffected (`current_exe` is the launch path, already the new bundle) and still deletes immediately.
+- macOS: if moving the new bundle in fails and restoring the old one fails too, the stage is kept and named instead of being deleted by the exit trap.
+- Tests: 6 of the 34 in `warper_update_tests.py` failed against the previous commit (exe path of a running process, accepted and declined restart, no-PID run and next update, warn-only failure to keep the binary, macOS double failure), 34 of 34 pass now (also under `bash --posix`); whole `lean/ci` suite 38 of 38.
+
 ## 2026-10-22 — updater keeps no previous copy
 
 - `warper-update` no longer leaves `warp-oss.previous` / `Warper.previous.app`: the old files live only in the hidden `.warper-update.*` stage while the swap can still be rolled back, and the stage is deleted as soon as the new install is in place (before the restart prompt, so closing the terminal there cannot leak the old binary; the EXIT trap stays as the fallback). A leftover from an older updater is removed (exact paths only; a failed removal only warns). The relauncher still starts the new path.
