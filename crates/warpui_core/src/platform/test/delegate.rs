@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::path::Path;
 use std::rc::Rc;
@@ -494,6 +495,41 @@ impl platform::DispatchDelegate for DispatchDelegate {
     }
 }
 
+#[cfg(not(target_family = "wasm"))]
+thread_local! {
+    static SYSTEM_FONT_LOADS: Cell<usize> = const { Cell::new(0) };
+}
+
+/// The number of times [`FontDB::load_all_system_fonts`] has run on the current thread.
+#[cfg(not(target_family = "wasm"))]
+pub fn system_font_loads() -> usize {
+    SYSTEM_FONT_LOADS.with(Cell::get)
+}
+
+thread_local! {
+    static FAMILY_NAME: RefCell<Option<String>> = const { RefCell::new(None) };
+}
+
+/// Restores the family name that [`set_family_name`] replaced.
+#[must_use = "the family name is restored when the guard drops"]
+pub struct FamilyNameGuard {
+    previous: Option<String>,
+}
+
+impl Drop for FamilyNameGuard {
+    fn drop(&mut self) {
+        FAMILY_NAME.with(|family_name| *family_name.borrow_mut() = self.previous.take());
+    }
+}
+
+/// Makes every family id resolve to `name` on the current thread, as a loaded font would, until
+/// the returned guard drops.
+pub fn set_family_name(name: &str) -> FamilyNameGuard {
+    let previous =
+        FAMILY_NAME.with(|family_name| family_name.borrow_mut().replace(name.to_string()));
+    FamilyNameGuard { previous }
+}
+
 #[cfg_attr(target_family = "wasm", allow(dead_code))]
 struct LoadedSystemFonts;
 impl platform::LoadedSystemFonts for LoadedSystemFonts {
@@ -529,6 +565,7 @@ impl platform::FontDB for FontDB {
     ) -> futures::future::BoxFuture<'static, Box<dyn platform::LoadedSystemFonts>> {
         use futures::FutureExt as _;
 
+        SYSTEM_FONT_LOADS.with(|loads| loads.set(loads.get() + 1));
         futures::future::ready(Box::new(LoadedSystemFonts) as Box<dyn platform::LoadedSystemFonts>)
             .boxed()
     }
@@ -579,7 +616,7 @@ impl platform::FontDB for FontDB {
     }
 
     fn load_family_name_from_id(&self, _id: crate::fonts::FamilyId) -> Option<String> {
-        None
+        FAMILY_NAME.with(|family_name| family_name.borrow().clone())
     }
 
     fn glyph_raster_bounds(

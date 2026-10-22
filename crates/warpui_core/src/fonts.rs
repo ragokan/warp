@@ -127,7 +127,10 @@ pub use external_fallback::{ExternalFontFamily, FallbackFontEvent, FallbackFontM
 pub(crate) use external_fallback::{FontBytes, RequestedFallbackFontSource};
 pub use metrics::Metrics;
 #[cfg(not(target_family = "wasm"))]
-use {futures_util::FutureExt, futures_util::future::BoxFuture};
+use {
+    futures_util::FutureExt,
+    futures_util::future::{BoxFuture, Shared},
+};
 
 pub type GlyphId = u32;
 
@@ -203,6 +206,9 @@ pub struct FontInfo {
 
 type RasterBoundsKey = (GlyphKey, (OrderedFloat<f32>, OrderedFloat<f32>));
 
+#[cfg(not(target_family = "wasm"))]
+type PendingSystemFonts = Shared<BoxFuture<'static, Vec<(Option<FamilyId>, FontInfo)>>>;
+
 pub struct Cache {
     selections: DashMap<(FamilyId, Properties), FontId>,
     /// Note that the properties stored in this map might not exactly match the
@@ -217,6 +223,10 @@ pub struct Cache {
     raster_bounds: DashMap<RasterBoundsKey, Result<RectI, Error>>,
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
     available_system_fonts: Option<Vec<(Option<FamilyId>, FontInfo)>>,
+    /// The in-flight enumeration of the system fonts, shared by concurrent callers of
+    /// [`Self::all_system_fonts`].
+    #[cfg(not(target_family = "wasm"))]
+    pending_system_fonts: Option<PendingSystemFonts>,
     font_fallback_cache: FontFallbackCache,
 }
 
@@ -251,6 +261,8 @@ impl Cache {
             glyph_typographic_bounds: Default::default(),
             raster_bounds: Default::default(),
             available_system_fonts: Default::default(),
+            #[cfg(not(target_family = "wasm"))]
+            pending_system_fonts: Default::default(),
             font_fallback_cache: Default::default(),
         }
     }
@@ -278,24 +290,29 @@ impl Cache {
     /// [`Self::set_system_fonts`].
     #[cfg(not(target_family = "wasm"))]
     pub fn all_system_fonts(
-        &self,
+        &mut self,
         ctx: &mut crate::ModelContext<Self>,
     ) -> BoxFuture<'static, Vec<(Option<FamilyId>, FontInfo)>> {
         if let Some(fonts) = self.available_system_fonts.as_ref() {
-            futures::future::ready(fonts.clone()).boxed()
-        } else {
-            log::info!("Computing available system fonts");
-            let (tx, rx) = futures::channel::oneshot::channel();
-            ctx.spawn(
-                self.platform.load_all_system_fonts(),
-                |me, loaded_system_fonts, _ctx| {
-                    let system_fonts = me.platform.process_loaded_system_fonts(loaded_system_fonts);
-                    me.available_system_fonts = Some(system_fonts.clone());
-                    let _ = tx.send(system_fonts);
-                },
-            );
-            rx.map(Result::unwrap_or_default).boxed()
+            return futures::future::ready(fonts.clone()).boxed();
         }
+        if let Some(pending) = self.pending_system_fonts.as_ref() {
+            return pending.clone().boxed();
+        }
+        log::info!("Computing available system fonts");
+        let (tx, rx) = futures::channel::oneshot::channel();
+        ctx.spawn(
+            self.platform.load_all_system_fonts(),
+            |me, loaded_system_fonts, _ctx| {
+                let system_fonts = me.platform.process_loaded_system_fonts(loaded_system_fonts);
+                me.available_system_fonts = Some(system_fonts.clone());
+                me.pending_system_fonts = None;
+                let _ = tx.send(system_fonts);
+            },
+        );
+        let pending = rx.map(Result::unwrap_or_default).boxed().shared();
+        self.pending_system_fonts = Some(pending.clone());
+        pending.boxed()
     }
 
     pub fn load_family_name_from_id(&self, id: FamilyId) -> Option<String> {

@@ -3,6 +3,8 @@ use pathfinder_geometry::rect::RectI;
 use pathfinder_geometry::vector::{Vector2F, Vector2I, vec2i};
 
 use super::*;
+#[cfg(not(target_family = "wasm"))]
+use crate::App;
 use crate::platform::{self, TextLayoutSystem};
 
 #[test]
@@ -178,4 +180,24 @@ fn em_width_falls_back_when_horizontal_advance_is_zero() {
     let cache = EmWidthFontDB::cache(None, Some(vec2i(0, 0)));
 
     assert_eq!(cache.em_width(FamilyId(0), 16.0), 16.0);
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[test]
+fn concurrent_system_font_requests_share_one_enumeration() {
+    App::test((), |mut app| async move {
+        let loads_before = platform::test::system_font_loads();
+        let cache = app.get_singleton_model_handle::<Cache>();
+        let (first, second) = cache.update(&mut app, |cache, ctx| {
+            (cache.all_system_fonts(ctx), cache.all_system_fonts(ctx))
+        });
+        app.finish_pending_tasks().await;
+        first.await;
+        second.await;
+        assert_eq!(platform::test::system_font_loads(), loads_before + 1);
+
+        let third = cache.update(&mut app, |cache, ctx| cache.all_system_fonts(ctx));
+        third.await;
+        assert_eq!(platform::test::system_font_loads(), loads_before + 1);
+    });
 }

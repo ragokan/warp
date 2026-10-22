@@ -1160,3 +1160,25 @@ fn category_header_with_trailing_element_and_no_subtitle_does_not_panic_flex_lay
         });
     });
 }
+
+#[cfg(feature = "lean")]
+#[test]
+fn lean_opens_settings_on_a_page_it_has() {
+    App::test((), |mut app| async move {
+        crate::workspace::view::tests::initialize_app(&mut app);
+        let workspace = crate::workspace::view::tests::mock_workspace(&mut app);
+        let window_id = workspace.update(&mut app, |_, ctx| ctx.window_id());
+        let settings_view =
+            app.read(|ctx| pane_manager::SettingsPaneManager::as_ref(ctx).settings_view(window_id));
+
+        // Opening Settings without a page requests the default section.
+        app.read(|ctx| {
+            assert!(
+                settings_view
+                    .as_ref(ctx)
+                    .settings_page(SettingsSection::default())
+                    .is_some()
+            );
+        });
+    });
+}

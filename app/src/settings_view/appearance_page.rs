@@ -84,7 +84,7 @@ use crate::ui_components::icons::Icon;
 use crate::user_config::WarpConfig;
 use crate::util::bindings;
 use crate::view_components::action_button::{ActionButton, ButtonSize, NakedTheme};
-use crate::view_components::{Dropdown, DropdownItem, FilterableDropdown};
+use crate::view_components::{Dropdown, DropdownItem, FilterableDropdown, FilterableDropdownEvent};
 use crate::window_settings::{
     BackgroundBackdrop, BackgroundBlurRadius, BackgroundOpacity, LeftPanelVisibilityAcrossTabs,
     OpenWindowsAtCustomSize, WindowSettings, WindowSettingsChangedEvent, ZoomLevel,
@@ -551,6 +551,8 @@ pub struct AppearanceSettingsPageView {
     zoom_level_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     zoom_reset_button_mouse_state: MouseStateHandle,
     available_families: HashMap<String, (Option<FamilyId>, FontType)>,
+    /// Lean loads the system fonts when the font dropdown is first opened rather than at startup.
+    system_fonts_requested: bool,
     view_font_type: FontType,
     alt_screen_padding_editor: ViewHandle<EditorView>,
     color_picker_dot_states: Vec<Vec<MouseStateHandle>>,
@@ -1087,18 +1089,8 @@ impl AppearanceSettingsPageView {
             ctx,
         );
 
-        // Don't load all available system fonts in integration tests; we don't
-        // have any integration tests which interact with the font dropdown, and
-        // loading them in the background slows down test execution.
-        if ChannelState::channel() != Channel::Integration {
-            // There's no such thing as a "system font" on the web, so the
-            // `all_system_fonts` API doesn't exist.
-            #[cfg(not(target_family = "wasm"))]
-            {
-                let all_system_fonts = warpui::fonts::Cache::handle(ctx)
-                    .update(ctx, |font_cache, ctx| font_cache.all_system_fonts(ctx));
-                ctx.spawn(all_system_fonts, Self::set_system_fonts);
-            }
+        if !cfg!(feature = "lean") {
+            Self::load_system_fonts(ctx);
         }
         let font_family_dropdown = ctx.add_typed_action_view(|ctx| {
             let mut dropdown = FilterableDropdown::new(ctx);
@@ -1109,6 +1101,11 @@ impl AppearanceSettingsPageView {
             dropdown.add_items(vec![Self::default_font_item(ctx, false)], ctx);
             dropdown.set_selected_by_index(0, ctx);
             dropdown
+        });
+        ctx.subscribe_to_view(&font_family_dropdown, |me, _, event, ctx| {
+            if let FilterableDropdownEvent::ToggleExpanded = event {
+                me.request_system_fonts(ctx);
+            }
         });
 
         let ai_font_family_dropdown = ctx.add_typed_action_view(|ctx| {
@@ -1339,6 +1336,7 @@ impl AppearanceSettingsPageView {
             zoom_level_dropdown: Self::build_zoom_level_dropdown(ctx),
             zoom_reset_button_mouse_state: MouseStateHandle::default(),
             available_families: Default::default(),
+            system_fonts_requested: !cfg!(feature = "lean"),
             view_font_type: Default::default(),
             color_picker_dot_states: (0..directory_tab_colors(ctx).len())
                 .map(|_| {
@@ -2102,7 +2100,7 @@ impl AppearanceSettingsPageView {
                 } else {
                     &font_name
                 };
-                dropdown.set_selected_by_name(label, ctx);
+                dropdown.set_selected_by_name_unless_filtered_out(label, ctx);
             }
         });
 
@@ -2160,11 +2158,34 @@ impl AppearanceSettingsPageView {
                 } else {
                     &font_name
                 };
-                dropdown.set_selected_by_name(label, ctx);
+                dropdown.set_selected_by_name_unless_filtered_out(label, ctx);
             }
         });
 
         ctx.notify();
+    }
+
+    fn request_system_fonts(&mut self, ctx: &mut ViewContext<Self>) {
+        if !self.system_fonts_requested {
+            self.system_fonts_requested = true;
+            Self::load_system_fonts(ctx);
+        }
+    }
+
+    fn load_system_fonts(ctx: &mut ViewContext<Self>) {
+        // Don't load all available system fonts in integration tests; we don't
+        // have any integration tests which interact with the font dropdown, and
+        // loading them in the background slows down test execution.
+        if ChannelState::channel() != Channel::Integration {
+            // There's no such thing as a "system font" on the web, so the
+            // `all_system_fonts` API doesn't exist.
+            #[cfg(not(target_family = "wasm"))]
+            {
+                let all_system_fonts = warpui::fonts::Cache::handle(ctx)
+                    .update(ctx, |font_cache, ctx| font_cache.all_system_fonts(ctx));
+                ctx.spawn(all_system_fonts, Self::set_system_fonts);
+            }
+        }
     }
 
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
@@ -5587,6 +5608,9 @@ impl SettingsPageMeta for AppearanceSettingsPageView {
     }
 
     fn on_page_selected(&mut self, _: bool, ctx: &mut ViewContext<Self>) {
+        if cfg!(feature = "lean") {
+            self.update_font_dropdown(ctx);
+        }
         ctx.notify();
     }
 
@@ -5608,3 +5632,7 @@ impl From<ViewHandle<AppearanceSettingsPageView>> for SettingsPageViewHandle {
         SettingsPageViewHandle::Appearance(view_handle)
     }
 }
+
+#[cfg(test)]
+#[path = "appearance_page_tests.rs"]
+mod tests;

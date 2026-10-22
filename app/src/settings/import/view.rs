@@ -126,6 +126,13 @@ impl SettingsImportView {
             me.handle_completed_parse_event(ctx, model_handle);
         });
 
+        #[cfg(feature = "local_fs")]
+        {
+            if cfg!(feature = "lean") {
+                model_handle.update(ctx, |model, ctx| model.ensure_search_started(ctx));
+            }
+        }
+
         Self {
             configs: if is_complete {
                 Self::create_menu_items(model_handle.as_ref(ctx).configs())

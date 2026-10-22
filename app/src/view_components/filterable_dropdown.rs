@@ -310,6 +310,24 @@ where
         ctx.notify();
     }
 
+    /// Like [`Self::set_selected_by_name`], but leaves the selection alone when the search filter
+    /// hides the item. Replacing the items while a query is active already selects the first
+    /// match, and clearing that selection would leave Enter with nothing to pick.
+    pub fn set_selected_by_name_unless_filtered_out(
+        &mut self,
+        selected_item: impl AsRef<str>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let name = selected_item.as_ref();
+        let filter_query = self.filter_query(ctx).to_lowercase();
+        let filtered_out = self.items.iter().any(|item| {
+            Self::item_label(item) == Some(name) && !Self::item_matches_filter(item, &filter_query)
+        });
+        if !filtered_out {
+            self.set_selected_by_name(name, ctx);
+        }
+    }
+
     /// Select the item at the given index. If the index is out of bounds, this clears the selection.
     pub fn set_selected_by_index(&mut self, selected_index: usize, ctx: &mut ViewContext<Self>) {
         self.dropdown.update(ctx, |dropdown, ctx| {

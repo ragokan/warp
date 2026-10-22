@@ -308,10 +308,9 @@ pub enum SettingsViewEvent {
 }
 
 /// Different navigation sections within the settings view
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum SettingsSection {
     About,
-    #[default]
     Account,
     BillingAndUsage,
     Appearance,
@@ -336,6 +335,17 @@ pub enum SettingsSection {
     // ── Cloud platform umbrella subpages ──
     CloudEnvironments,
     WarpCloudAgentAPIKeys,
+}
+
+impl Default for SettingsSection {
+    fn default() -> Self {
+        // Lean has no Account page; opening on Appearance runs that page's selection hook.
+        if cfg!(feature = "lean") {
+            Self::Appearance
+        } else {
+            Self::Account
+        }
+    }
 }
 
 use std::fmt::{self, Display};

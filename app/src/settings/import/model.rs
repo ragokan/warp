@@ -1,3 +1,5 @@
+#[cfg(all(test, feature = "local_fs"))]
+use std::cell::Cell;
 use std::collections::HashMap;
 
 use serde::Serialize;
@@ -27,6 +29,11 @@ pub struct CompletedParseEvent {
     pub terminal: TerminalType,
 }
 
+#[cfg(all(test, feature = "local_fs"))]
+thread_local! {
+    static SEARCH_STARTS: Cell<usize> = const { Cell::new(0) };
+}
+
 pub struct ImportedConfigModel {
     started: bool,
     parsed_terminals: HashMap<TerminalType, Result<Vec<Config>, ConfigError>>,
@@ -40,6 +47,15 @@ impl ImportedConfigModel {
         }
     }
 
+    /// Starts the search unless it already ran. Lean defers it from app startup, because it
+    /// loads every system font.
+    #[cfg(feature = "local_fs")]
+    pub fn ensure_search_started(&mut self, ctx: &mut ModelContext<Self>) {
+        if !self.started {
+            self.search_for_settings_to_import(ctx);
+        }
+    }
+
     #[cfg(feature = "local_fs")]
     pub fn search_for_settings_to_import(&mut self, ctx: &mut ModelContext<Self>) {
         use std::sync::Arc;
@@ -47,6 +63,8 @@ impl ImportedConfigModel {
         use itertools::Itertools;
         use strum::IntoEnumIterator;
         self.started = true;
+        #[cfg(test)]
+        SEARCH_STARTS.with(|starts| starts.set(starts.get() + 1));
 
         let loaded_system_fonts = warpui::fonts::Cache::handle(ctx)
             .update(ctx, |font_cache, ctx| font_cache.all_system_fonts(ctx));
@@ -258,3 +276,7 @@ impl Entity for ImportedConfigModel {
 }
 
 impl SingletonEntity for ImportedConfigModel {}
+
+#[cfg(all(test, feature = "local_fs"))]
+#[path = "model_tests.rs"]
+mod tests;
