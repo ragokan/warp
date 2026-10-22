@@ -398,7 +398,9 @@ class LinuxUpdateTests(UpdateTests):
         running.wait(timeout=20)
         self.assertTrue(self.wait_for(started), "the new binary was not launched")
         time.sleep(0.3)
-        self.assertEqual(started.read_text().strip(), f"{self.app / 'warp-oss'} gone")
+        launched, state = started.read_text().split()
+        self.assertEqual(Path(launched).resolve(), (self.app / "warp-oss").resolve())
+        self.assertEqual(state, "gone")
 
     def test_a_declined_restart_keeps_the_old_binary_resolvable_until_warper_exits(self):
         self.install_version("0.9.0")
