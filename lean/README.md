@@ -241,6 +241,7 @@ fixes listed below also apply to default builds.
 | `app/src/app_services/linux/mod.rs` | Enables existing single-instance URL forwarding so a second launch hands its arguments to the running Warper. |
 | `app/src/terminal/view.rs` | Drops intercepted `warp://cli-agent` OSC 777 payloads without registering listeners. Lean Linux caps terminal wakeups at 30/s for software rendering; other builds keep 60/s. |
 | `app/src/terminal/alt_screen/alt_screen_element.rs` | Lean skips background-color sampling for its hidden footer consumers. |
+| `app/src/editor/view/mod.rs`, `app/src/editor/view/mod_tests.rs` | Lean stops the editor cursor blink (and its redraw timer) after 30 s without an editor event; the next event restarts it. A window that is not the active one already stops the timer upstream; a test pins both. |
 | `app/src/features_lean_tests.rs`, `app/src/lib_tests.rs`, `app/src/settings/{ai,privacy}_tests.rs`, `app/src/uri/uri_tests.rs`, `app/src/settings_view/update_environment_form_tests.rs` | Policy, startup, privacy and hidden network-fetch regression checks. |
 
 `lean/` owns the Dockerfile, build/install/sync scripts, tooling self-check, benchmark sampler,

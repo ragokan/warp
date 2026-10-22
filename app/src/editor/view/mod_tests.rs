@@ -4110,6 +4110,83 @@ fn test_cursor_blink() {
     });
 }
 
+#[cfg(feature = "lean")]
+#[test]
+fn test_cursor_blink_stops_when_idle_or_unfocused() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+
+        let (window_id, editor_handle) = app.add_window(WindowStyle::NotStealFocus, |ctx| {
+            let mut editor = EditorView::single_line(Default::default(), ctx);
+            editor.on_focus(&FocusContext::SelfFocused, ctx);
+            editor
+        });
+        let windowing_state = app.get_singleton_model_handle::<WindowManager>();
+        app.update_model(&windowing_state, |state, ctx| {
+            state.overwrite_for_test(state.stage(), Some(window_id));
+            ctx.notify();
+        });
+
+        // An active editor keeps blinking: every tick toggles the cursor and schedules the next.
+        app.update_view(&editor_handle, |editor, ctx| {
+            editor.reset_cursor_blink_timer(ctx);
+            let epoch = editor.blink_epoch;
+            editor.blink_cursors(epoch, ctx);
+            assert!(!editor.cursors_visible);
+            assert_ne!(editor.blink_epoch, epoch);
+        });
+
+        // After the idle timeout the cursor settles visible and no timer is scheduled.
+        app.update_view(&editor_handle, |editor, ctx| {
+            editor.last_cursor_activity = Instant::now()
+                .checked_sub(CURSOR_BLINK_IDLE_TIMEOUT)
+                .expect("monotonic clock is past the idle timeout");
+            let epoch = editor.blink_epoch;
+            editor.blink_cursors(epoch, ctx);
+            assert!(editor.cursors_visible);
+            assert_eq!(editor.blink_epoch, epoch);
+        });
+
+        // Input that changes nothing (Left at the start of the buffer) restarts it too, then the
+        // editor goes idle again.
+        let epoch_while_idle = app.update_view(&editor_handle, |editor, _| editor.blink_epoch);
+        app.update_view(&editor_handle, |editor, ctx| {
+            editor.handle_action(&EditorAction::Left, ctx);
+            assert_ne!(editor.blink_epoch, epoch_while_idle);
+            assert!(!editor.cursor_blink_idle());
+            editor.last_cursor_activity = Instant::now()
+                .checked_sub(CURSOR_BLINK_IDLE_TIMEOUT)
+                .expect("monotonic clock is past the idle timeout");
+            let epoch = editor.blink_epoch;
+            editor.blink_cursors(epoch, ctx);
+            assert!(editor.cursors_visible);
+            assert_eq!(editor.blink_epoch, epoch);
+        });
+
+        // Typing restarts the blink.
+        let epoch_while_idle = app.update_view(&editor_handle, |editor, _| editor.blink_epoch);
+        app.update_view(&editor_handle, |editor, ctx| editor.user_insert("a", ctx));
+        app.update_view(&editor_handle, |editor, ctx| {
+            assert_ne!(editor.blink_epoch, epoch_while_idle);
+            assert!(!editor.cursor_blink_idle());
+            let epoch = editor.blink_epoch;
+            editor.blink_cursors(epoch, ctx);
+            assert!(!editor.cursors_visible);
+        });
+
+        // An unfocused window never schedules a blink timer.
+        app.update_model(&windowing_state, |state, ctx| {
+            state.overwrite_for_test(state.stage(), None);
+            ctx.notify();
+        });
+        app.update_view(&editor_handle, |editor, ctx| {
+            let epoch = editor.blink_epoch;
+            editor.blink_cursors(epoch, ctx);
+            assert_eq!(editor.blink_epoch, epoch);
+        });
+    });
+}
+
 #[test]
 fn test_interaction_state() {
     App::test((), |mut app| async move {

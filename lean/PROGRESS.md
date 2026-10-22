@@ -1,5 +1,21 @@
 # Lean build progress
 
+## 2026-10-22 — idle cursor stops blinking
+
+- `EditorView` (`app/src/editor/view/mod.rs`; the prompt editor and every other editor view) blinks from a 500 ms spawned timer whose callback toggles the cursor and calls `notify()`, so each tick is a full redraw (Metal on macOS, wgpu/llvmpipe on Linux). Under lean a tick that finds no editor activity for 30 s (`last_cursor_activity`, refreshed by gaining focus, by `reset_cursor_blink_timer`, which window re-activation and every editor model event already call, and by every editor action in `handle_action`) leaves the cursor visible and does not reschedule: no timer is pending and nothing redraws. The next editor event or action restarts the blink, so input that changes nothing (Left at the start of the buffer, forward Delete at the end) restarts it as well. `cursor_blink = "disabled"` and non-lean builds are unchanged.
+- An inactive window already stopped upstream: `blink_cursors` only reschedules while the editor is focused in the active window, and an inactive window draws no cursor. Nothing was added for that case; the test pins it.
+- `crates/editor`'s own blink (`update_blink_state`, `repaint_after`) belongs to the code editor and notebooks, which lean hides; it is untouched. The other periodic repaint sources in the code are `LiveElement` (a running command's elapsed time) and animated images, neither present at an idle prompt. The Linux run below saw nothing else in a 30 s window, but the 0.20% it measures in the 60 s windows afterwards is one more periodic repaint: the AI assistant panel's 60 s refresh tick, removed under lean in the AI panel entry above.
+- Tested: `test_cursor_blink_stops_when_idle_or_unfocused` (active editor keeps rescheduling; after the idle timeout the cursor is visible and `blink_epoch`, which advances whenever a timer is spawned, stays put; input that changes nothing and typing both restart it; an inactive window schedules nothing). Red with the idle check stubbed out (`left: 3, right: 2`), and the no-op-input stage red without the `handle_action` hook (`left: 2, right: 2`); green with both; the existing `test_cursor_blink` still passes.
+- Linux (isolated XDG dirs checked in `/proc/PID/environ`, default settings so blink is on; the real config has `cursor_blink = "disabled"`, which is why the earlier idle benchmark read 0.35%; llvmpipe software rendering makes each blink frame cost about 135 ms of CPU). Desktop idle throughout, Warper the only window and the active one. One keystroke, then two consecutive sampler windows of about 100 s each (`bench.sh 60`: 60 one-second samples plus sampling overhead):
+
+  | build | 0-100 s after typing | 100-200 s | unfocused |
+  | --- | --- | --- | --- |
+  | 6d27b62ad | 26.89%, 26.88% (second run) | 26.88% | 0.37% |
+  | this commit | 7.04% (30 s of blink, then solid) | 0.20% | not re-measured |
+
+  After the blink stops, a 30 s window used 0 CPU ticks in every thread (too short to see a 60 s timer; see the 0.20% above), typing one more key made the next 20 s run at 26.6% again, and the following 20 s idle window used 0 ticks.
+- Unverified here: macOS. The Mac check is the same sequence on the real display: type one character, then sample CPU in 60 s windows (expect about half the blink cost in the first, the `cursor_blink = disabled` level of about 0.12% in the second), a window that is visible but not frontmost (should match the unfocused 0.09%), and typing again to confirm it resumes.
+
 ## 2026-10-22 — builder: parallel rustc frontend for workspace crates
 
 - `lean/rustc-wrapper` (set as `RUSTC_WRAPPER` by `lean/Dockerfile.linux` only; CI does not use that image) adds `RUSTC_BOOTSTRAP=1 -Zthreads=${LEAN_RUSTC_THREADS:-8}` to workspace-crate compiles, recognised by `CARGO_MANIFEST_DIR` under `/work` plus `CARGO_CRATE_NAME` (set for compiles, not for build-script runs). A logging copy over a cold `cargo check -p asset_macro` showed 4 of 125 invocations touched (the workspace crates) and every registry crate, `rustc -vV` probe and proc-macro2/anyhow build-script probe passed through without `RUSTC_BOOTSTRAP`. Cargo fingerprints are unchanged: after a no-wrapper build, wrapper on and wrapper off were both `Fresh` (6.7 s and 0.8 s).

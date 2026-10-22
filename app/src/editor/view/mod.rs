@@ -23,6 +23,7 @@ use base64::Engine as _;
 use base64::engine::general_purpose;
 use element::CommandXRayMouseStateHandle;
 use figma_utils::is_figma_png;
+use instant::Instant;
 use itertools::{Either, Itertools};
 use mime_guess::from_path;
 use model::{
@@ -134,6 +135,9 @@ use crate::vim_registers::{RegisterContent, VimRegisters};
 use crate::workspace::{ToastStack, Workspace};
 
 const CURSOR_BLINK_INTERVAL: Duration = Duration::from_millis(500);
+/// Under lean, the cursor stops blinking (and its redraw timer lapses) after this long without
+/// editor activity.
+const CURSOR_BLINK_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
 const DEFAULT_TAB_SIZE: usize = 4;
 
 pub const ACCEPT_AUTOSUGGESTION_KEYBINDING_NAME: &str = "editor_view:insert_autosuggestion";
@@ -1779,6 +1783,7 @@ pub struct EditorView {
     get_cursor_colors_fn: CursorColorsFn,
     cursors_visible: bool,
     blink_epoch: usize,
+    last_cursor_activity: Instant,
     single_line: bool,
     /// A cache for text that is cut within the input using ctrl-k/u. This text is not copied to clipboard.
     internal_clipboard: String,
@@ -3197,6 +3202,7 @@ impl EditorView {
             focused: false,
             cursors_visible: false,
             blink_epoch: 0,
+            last_cursor_activity: Instant::now(),
             single_line: options.single_line,
             internal_clipboard: "".to_string(),
             propagate_vertical_navigation_keys: options
@@ -7555,6 +7561,7 @@ impl EditorView {
     /// Mark the cursor as visible and schedule the next cursor blink at the right interval.
     fn reset_cursor_blink_timer(&mut self, ctx: &mut ViewContext<Self>) {
         self.cursors_visible = true;
+        self.last_cursor_activity = Instant::now();
         ctx.notify();
 
         let epoch = self.next_blink_epoch();
@@ -7586,6 +7593,15 @@ impl EditorView {
                 cursor_blink.value() == &CursorBlink::Enabled || !self.cursors_visible
             )
         {
+            if self.cursor_blink_idle() {
+                // Settle on a visible cursor and don't reschedule, so an idle editor stops
+                // redrawing. The next editor event restarts the blink.
+                if !self.cursors_visible {
+                    self.cursors_visible = true;
+                    ctx.notify();
+                }
+                return;
+            }
             self.cursors_visible = !self.cursors_visible;
             ctx.notify();
 
@@ -7598,6 +7614,23 @@ impl EditorView {
                 Self::blink_cursors,
             );
         }
+    }
+
+    /// Counts an editor action as activity, so input that changes nothing still restarts a blink
+    /// that went idle.
+    fn note_cursor_activity(&mut self, ctx: &mut ViewContext<Self>) {
+        if !cfg!(feature = "lean") {
+            return;
+        }
+        if self.cursor_blink_idle() && self.focused_in_active_window(ctx) {
+            self.reset_cursor_blink_timer(ctx);
+        } else {
+            self.last_cursor_activity = Instant::now();
+        }
+    }
+
+    fn cursor_blink_idle(&self) -> bool {
+        cfg!(feature = "lean") && self.last_cursor_activity.elapsed() >= CURSOR_BLINK_IDLE_TIMEOUT
     }
 
     fn focused_in_active_window(&self, ctx: &AppContext) -> bool {
@@ -8554,6 +8587,7 @@ impl TypedActionView for EditorView {
 
     fn handle_action(&mut self, action: &EditorAction, ctx: &mut ViewContext<Self>) {
         use EditorAction::*;
+        self.note_cursor_activity(ctx);
         match action {
             Scroll(position) => self.scroll(*position, ctx),
             Select(action) => self.select(action, ctx),
@@ -8857,6 +8891,7 @@ impl View for EditorView {
     fn on_focus(&mut self, focus_ctx: &FocusContext, ctx: &mut ViewContext<Self>) {
         if focus_ctx.is_self_focused() {
             self.focused = true;
+            self.last_cursor_activity = Instant::now();
             self.blink_cursors(self.blink_epoch, ctx);
             if self.select_all_on_focus {
                 self.select_all(ctx);
