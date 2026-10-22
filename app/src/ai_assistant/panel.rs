@@ -1,3 +1,5 @@
+#[cfg(test)]
+use std::cell::Cell;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -54,6 +56,11 @@ const INFO_ICON_SVG_PATH: &str = "bundled/svg/info.svg";
 pub const HEXAGON_ALERT_SVG_PATH: &str = "bundled/svg/alert-hexagon.svg";
 
 const EDITOR_SAVE_POSITION_ID: &str = "ai_assistant::editor";
+
+#[cfg(test)]
+thread_local! {
+    static REFRESH_TICKS_ARMED: Cell<usize> = const { Cell::new(0) };
+}
 
 const MIN_PANEL_WIDTH: f32 = 300.;
 const MIN_REMAINING_WINDOW_SIZE: f32 = 200.;
@@ -251,7 +258,9 @@ impl AIAssistantPanelView {
             mouse_state_handles: Default::default(),
         };
 
-        panel.tick(ctx);
+        if !cfg!(feature = "lean") {
+            panel.tick(ctx);
+        }
         panel.on_active_session_change(active_session_model, ctx);
         panel
     }
@@ -274,6 +283,8 @@ impl AIAssistantPanelView {
 
     // Every minute, we re-render to make the next refresh time tick.
     fn tick(&self, ctx: &mut ViewContext<Self>) {
+        #[cfg(test)]
+        REFRESH_TICKS_ARMED.with(|armed| armed.set(armed.get() + 1));
         ctx.spawn(
             async move { Timer::after(Duration::from_secs(60)).await },
             |view, _, ctx| {
@@ -1186,3 +1197,7 @@ impl View for AIAssistantPanelView {
         .finish()
     }
 }
+
+#[cfg(test)]
+#[path = "panel_tests.rs"]
+mod tests;
