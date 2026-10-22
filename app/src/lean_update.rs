@@ -11,6 +11,7 @@ use warpui::platform::TerminationMode;
 
 use crate::launch_configs::launch_config::{CommandTemplate, PaneMode, PaneTemplateType};
 use crate::pane_group::PanesLayout;
+use crate::quit_warning::UnsavedStateSummary;
 use crate::workspace::Workspace;
 
 const SCRIPT_NAME: &str = "warper-update";
@@ -20,7 +21,7 @@ const POLL_INTERVAL: Duration = Duration::from_secs(1);
 const POLLS: u32 = 1800;
 
 /// Opens a tab running the bundled `warper-update` script, the only code that ever reaches the
-/// network, and quits the way the Quit action does once the script has started its relauncher.
+/// network, and quits once the script has started its relauncher.
 pub fn open_update_tab(workspace: &mut Workspace, ctx: &mut ViewContext<Workspace>) {
     let exe = std::env::current_exe().unwrap_or_default();
     let pid = std::process::id();
@@ -67,6 +68,16 @@ fn take_restart_request(marker: &Path) -> bool {
     fs::remove_file(marker).is_ok()
 }
 
+/// The script has already asked the user to restart, so the update tab's own running command must
+/// not raise the Quit dialog; unsaved code is still protected by it.
+fn restart_termination_mode(has_unsaved_code_changes: bool) -> TerminationMode {
+    if has_unsaved_code_changes {
+        TerminationMode::Cancellable
+    } else {
+        TerminationMode::ForceTerminate
+    }
+}
+
 fn quit_when_restart_requested(marker: PathBuf, polls_left: u32, ctx: &mut ViewContext<Workspace>) {
     ctx.spawn(
         async move {
@@ -75,7 +86,8 @@ fn quit_when_restart_requested(marker: PathBuf, polls_left: u32, ctx: &mut ViewC
         },
         move |_, (requested, marker), ctx| {
             if requested {
-                ctx.terminate_app(TerminationMode::Cancellable, None);
+                let unsaved = UnsavedStateSummary::for_app(ctx).has_unsaved_code_changes();
+                ctx.terminate_app(restart_termination_mode(unsaved), None);
             } else if polls_left > 0 {
                 quit_when_restart_requested(marker, polls_left - 1, ctx);
             }

@@ -350,6 +350,10 @@ impl<'a> UnsavedStateSummary<'a> {
         }
     }
 
+    pub fn has_unsaved_code_changes(&self) -> bool {
+        self.unsaved_code_changes
+    }
+
     pub fn should_display_warning(&self, ctx: &AppContext) -> bool {
         *GeneralSettings::as_ref(ctx).show_warning_before_quitting
             && (self.total_long_running_commands > 0

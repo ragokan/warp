@@ -1,8 +1,9 @@
 # Lean build progress
 
-## 2026-10-22 — built-in Yoda avatar
+## 2026-10-22 — update restart without the Quit dialog
 
-- The avatar button shows the bundled `jpg/warper_avatar.jpg` (554×554, `bundled_asset!`, always embedded) unless `avatar.png`/`.jpg`/`.jpeg` exists in the config directory; the gear is only the loading/decode-failure placeholder. `AvatarContent::LocalFile` became the general `AvatarContent::Asset`; non-lean rendering is unchanged. Two unit tests (red with the built-in arm stubbed out, green after); lean release binary 262,390,328 B vs 262,455,832 B at 02f0f210c (−65,504 B despite the 35,213 B image). Checked in the GUI with isolated XDG dirs: built-in Yoda without a file, a replacement `avatar.png` wins.
+- The restart marker now quits with `TerminationMode::ForceTerminate` (the mode behind the dialog's own "Yes, quit"; same shutdown path) unless a code editor or review has unsaved changes, then it stays `Cancellable`. Before, the update tab's own command could still be running when the marker was polled and raised "Quit Warp? You have 1 process running" (seen on the real 0.3.0 → 0.3.1 update); a dialog left open for 60 s made the relauncher give up.
+- Unit test for the mode choice (red with a stub, green after). End to end with a local fake 0.3.2 release in isolated dirs, the script kept running after its restart request to force the race: 0.3.1 build shows the dialog; this build quits 2 s after the answer with the usual shutdown log, the relauncher starts the new binary 1 s later and the session is restored.
 
 ## 2026-10-21 — Update Warper command
 

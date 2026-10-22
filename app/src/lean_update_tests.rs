@@ -48,3 +48,15 @@ fn a_restart_request_is_consumed_once() {
     assert!(take_restart_request(&marker));
     assert!(!take_restart_request(&marker));
 }
+
+#[test]
+fn the_restart_quit_skips_the_dialog_unless_code_is_unsaved() {
+    assert!(matches!(
+        restart_termination_mode(false),
+        TerminationMode::ForceTerminate
+    ));
+    assert!(matches!(
+        restart_termination_mode(true),
+        TerminationMode::Cancellable
+    ));
+}

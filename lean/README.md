@@ -138,8 +138,9 @@ instead of treating the release as an update. On yes it downloads the release ar
 on a missing or mismatching checksum, installs, then asks whether to restart Warper now (open tabs
 close). On yes the script starts a detached relauncher that sends no signal: it waits up to 60 s
 for Warper's process to exit, then starts the new version, and Warper quits through its normal
-Quit action, so the usual shutdown and state save run. If Warper never exits (say, you cancel the
-quit prompt) the relauncher gives up silently. Answer no and the update applies the next time you
+shutdown, so the usual state save runs. It skips the "Quit Warp?" dialog, because you just
+confirmed; unsaved code changes still raise it. If Warper never exits (say, you cancel that
+dialog) the relauncher gives up silently. Answer no and the update applies the next time you
 launch it. The tab hands Warper's PID to the script, so run from another terminal the script just
 installs.
 
@@ -185,7 +186,7 @@ fixes listed below also apply to default builds.
 | `app/src/drive/settings.rs` | Hides Drive surfaces without disabling settings sync. |
 | `app/src/lib.rs` | Never uses the platform keychain (the existing "unavailable" secure storage), so the app is always signed out; disables loopback HTTP, outlining/index restoration, Oz/agent/remote CLI modes custom AI endpoint initialization and AWS AI-credential subscriptions. Normal terminal-server workers remain available. |
 | `app/src/ui_components/avatar.rs`, `app/src/workspace/view.rs`, `app/assets/bundled/jpg/warper_avatar.jpg` | The avatar button shows the user's `avatar.png`/`.jpg`/`.jpeg` from the config directory, else the built-in Yoda image (an always-embedded bundled asset); the gear icon is only the loading and decode-failure placeholder. |
-| `app/src/lean_update.rs`, `app/src/workspace/mod.rs`, `app/src/workspace/view.rs`, `app/src/app_menus.rs`, `app/src/util/bindings.rs` | Lean-only "Check for Updates…" command (macOS app menu, avatar menu, command palette) opening a tab that runs the bundled `warper-update`; Warper itself makes no request. |
+| `app/src/lean_update.rs`, `app/src/quit_warning/mod.rs`, `app/src/workspace/mod.rs`, `app/src/workspace/view.rs`, `app/src/app_menus.rs`, `app/src/util/bindings.rs` | Lean-only "Check for Updates…" command (macOS app menu, avatar menu, command palette) opening a tab that runs the bundled `warper-update`; Warper itself makes no request. The restart quit skips the Quit dialog unless code is unsaved. |
 | `crates/settings/src/lib.rs` | GUI settings never sync to the cloud: the syncer runs in the same inert mode as the TUI's. |
 | `app/src/server/cloud_objects/listener.rs` | Never starts the cloud-objects websocket, even with objects cached from an earlier login. |
 | `crates/http_client/src/lib.rs` | Fail-safe: every client resolves hosts through a resolver that always fails and ignores proxies, so no request can leave the machine. |
