@@ -121,11 +121,11 @@ blocks, Find, copy and syntax highlighting remain. The “Show Warp network log�
 
 ## Avatar
 
-The round button at the top right opens the avatar menu. It shows `avatar.png`, falling back to
-`avatar.jpg` and then `avatar.jpeg`, from the config directory that holds `settings.toml`
-(`~/.config/warp-oss` on Linux, `~/.warp-oss` on macOS). Without one, or if the file cannot be
-decoded, it shows the built-in gear icon. The image is looked up once per run and cropped to a
-circle; restart Warper after replacing it. No image ships with Warper.
+The round button at the top right opens the avatar menu. It shows the Yoda image built into
+Warper. To use your own, put `avatar.png`, `avatar.jpg` or `avatar.jpeg` (first match wins) in the
+config directory that holds `settings.toml` (`~/.config/warp-oss` on Linux, `~/.warp-oss` on
+macOS). The gear icon only shows while the image loads or if it cannot be decoded. The image is
+looked up once per run and cropped to a circle; restart Warper after replacing it.
 
 ## Updates
 
@@ -184,7 +184,7 @@ fixes listed below also apply to default builds.
 | `app/src/settings/privacy.rs` | Effective collection stays off; legacy privacy fetch/migration cannot overwrite stored or synced choices. Secret-regex initialization remains. |
 | `app/src/drive/settings.rs` | Hides Drive surfaces without disabling settings sync. |
 | `app/src/lib.rs` | Never uses the platform keychain (the existing "unavailable" secure storage), so the app is always signed out; disables loopback HTTP, outlining/index restoration, Oz/agent/remote CLI modes custom AI endpoint initialization and AWS AI-credential subscriptions. Normal terminal-server workers remain available. |
-| `app/src/ui_components/avatar.rs`, `app/src/workspace/view.rs` | The avatar button shows the user's `avatar.png`/`.jpg`/`.jpeg` from the config directory, with the gear icon as fallback. |
+| `app/src/ui_components/avatar.rs`, `app/src/workspace/view.rs`, `app/assets/bundled/jpg/warper_avatar.jpg` | The avatar button shows the user's `avatar.png`/`.jpg`/`.jpeg` from the config directory, else the built-in Yoda image (an always-embedded bundled asset); the gear icon is only the loading and decode-failure placeholder. |
 | `app/src/lean_update.rs`, `app/src/workspace/mod.rs`, `app/src/workspace/view.rs`, `app/src/app_menus.rs`, `app/src/util/bindings.rs` | Lean-only "Check for Updates…" command (macOS app menu, avatar menu, command palette) opening a tab that runs the bundled `warper-update`; Warper itself makes no request. |
 | `crates/settings/src/lib.rs` | GUI settings never sync to the cloud: the syncer runs in the same inert mode as the TUI's. |
 | `app/src/server/cloud_objects/listener.rs` | Never starts the cloud-objects websocket, even with objects cached from an earlier login. |

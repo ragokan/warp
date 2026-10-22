@@ -1,5 +1,9 @@
 # Lean build progress
 
+## 2026-10-22 — built-in Yoda avatar
+
+- The avatar button shows the bundled `jpg/warper_avatar.jpg` (554×554, `bundled_asset!`, always embedded) unless `avatar.png`/`.jpg`/`.jpeg` exists in the config directory; the gear is only the loading/decode-failure placeholder. `AvatarContent::LocalFile` became the general `AvatarContent::Asset`; non-lean rendering is unchanged. Two unit tests (red with the built-in arm stubbed out, green after); lean release binary 262,390,328 B vs 262,455,832 B at 02f0f210c (−65,504 B despite the 35,213 B image). Checked in the GUI with isolated XDG dirs: built-in Yoda without a file, a replacement `avatar.png` wins.
+
 ## 2026-10-21 — Update Warper command
 
 - New `lean/warper-update` (POSIX shell, the only networked code and only while it runs): latest

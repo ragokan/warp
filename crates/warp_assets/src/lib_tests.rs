@@ -14,4 +14,5 @@ fn async_assets_follow_the_lean_and_standalone_features() {
     );
     assert_eq!(Assets.get("async/jpg/marble_bg.jpg").is_err(), standalone);
     assert!(Assets.get("bundled/svg/droid.svg").is_ok());
+    assert!(Assets.get("bundled/jpg/warper_avatar.jpg").is_ok());
 }

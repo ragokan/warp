@@ -23,3 +23,28 @@ fn avatar_file_ignores_other_names_and_directories() {
         Some(dir.path().join("avatar.jpg"))
     );
 }
+
+#[test]
+fn avatar_source_is_the_built_in_image_without_a_config_file() {
+    let dir = tempfile::tempdir().unwrap();
+    assert_eq!(
+        avatar_source(dir.path()),
+        AssetSource::Bundled {
+            path: "bundled/jpg/warper_avatar.jpg"
+        }
+    );
+}
+
+#[test]
+fn avatar_source_prefers_the_config_file_over_the_built_in_image() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("avatar.png");
+    std::fs::write(&file, b"").unwrap();
+    assert_eq!(
+        avatar_source(dir.path()),
+        AssetSource::LocalFile {
+            path: file.to_string_lossy().into_owned(),
+            content_version: None
+        }
+    );
+}

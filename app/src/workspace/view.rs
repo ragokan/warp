@@ -447,7 +447,7 @@ use crate::themes::theme_creator_modal::{ThemeCreatorModal, ThemeCreatorModalEve
 use crate::themes::theme_deletion_modal::{ThemeDeletionModal, ThemeDeletionModalEvent};
 use crate::tips::{TipsEvent, TipsView};
 use crate::ui_components::avatar::{
-    Avatar, AvatarContent, StatusElementTypes, configured_avatar_file,
+    Avatar, AvatarContent, StatusElementTypes, configured_avatar_source,
 };
 use crate::ui_components::buttons::{combo_inner_button, icon_button_with_color};
 use crate::ui_components::red_notification_dot::RedNotificationDot;
@@ -22005,11 +22005,9 @@ impl Workspace {
             .username_for_display()
             .unwrap_or(DEFAULT_USER_DISPLAY_NAME.to_owned());
 
-        let avatar_content = if cfg!(feature = "lean")
-            && let Some(path) = configured_avatar_file()
-        {
-            AvatarContent::LocalFile {
-                path: path.to_path_buf(),
+        let avatar_content = if cfg!(feature = "lean") {
+            AvatarContent::Asset {
+                source: configured_avatar_source().clone(),
                 fallback: icons::Icon::Gear,
             }
         } else if self.auth_state.is_anonymous_or_logged_out() {
