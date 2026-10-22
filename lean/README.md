@@ -147,18 +147,19 @@ installs.
 - Linux: updates the install the script sits in (`warp-oss`, `warper-update`, `resources/` and
   `VERSION` in one directory, `~/.local/lib/warp-lean` after `lean/install-linux.sh`); a portable
   copy without `warp-oss` is refused. It stages the whole new install beside it, swaps the pieces
-  with renames and puts the old ones back if any step fails. The old binary is kept as
-  `warp-oss.previous` (replacing an older one); the other old pieces are replaced. If it cannot
-  restore them or keep the old binary it leaves them in the hidden `.warper-update.*` folder next
-  to the install and prints the path. If an update is interrupted (a SIGKILL or power loss between
-  the renames), the previous files are in that folder; move them back. The script finds its
-  install through symlinks too. `VERSION` comes
+  with renames and puts the old ones back if any step fails. Once the new install is in place the
+  old files are deleted, so no previous copy remains (a `warp-oss.previous` left by an older
+  updater is removed too; a running Warper keeps working from its open files). If it cannot
+  restore them it leaves them in the hidden `.warper-update.*` folder next to the install and
+  prints the path. If an update is interrupted (a SIGKILL or power loss between the renames), the
+  previous files are in that folder; move them back. The script finds its install through
+  symlinks too. `VERSION` comes
   from the release tag: the release archive ships it and `lean/install-linux.sh` copies it, but
   removes it for a source build, which the updater then reports as "installed version unknown
   (built from source)".
-- macOS: replaces the running `Warper.app` in place, without sudo, keeping the previous app as
-  `Warper.previous.app` beside it (replacing an older one only once the new backup is in place;
-  delete it when you no longer need it).
+- macOS: replaces the running `Warper.app` in place, without sudo. The old app waits in the
+  hidden `.warper-update.*` folder beside it until the new one is in place (and is moved back if
+  that fails), then it is deleted, together with a `Warper.previous.app` left by an older updater.
   If the app's folder is not writable it says so and stops. The installed version is the bundle's
   `CFBundleShortVersionString`.
 

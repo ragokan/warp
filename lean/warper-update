@@ -134,12 +134,9 @@ if [ "$os" = linux ]; then
             die "could not install $name; the previous install was restored"
         }
     done
-    if ! mv "$stage/old/warp-oss" "$app/warp-oss.previous"; then
-        keep_stage=1
-        echo "warper-update: could not keep the previous binary; it is in $stage/old/warp-oss" >&2
-    fi
+    # Older updaters kept the previous binary here.
+    rm -f "$app/warp-oss.previous" || echo "warper-update: could not remove $app/warp-oss.previous" >&2
     launch="$app/warp-oss"
-    echo "Installed Warper $latest (previous binary: $app/warp-oss.previous)"
 else
     parent=$(dirname "$bundle")
     [ -w "$parent" ] || die "$parent is not writable; move Warper.app somewhere you own and retry"
@@ -147,23 +144,25 @@ else
     ditto -x -k "$work/$asset" "$stage"
     [ -d "$stage/Warper.app" ] || die "the archive has no Warper.app"
     codesign --verify --deep --strict "$stage/Warper.app" || die "the new Warper.app has an invalid signature"
-    previous=${bundle%.app}.previous.app
-    mv "$bundle" "$stage/previous.app"
+    mv "$bundle" "$stage/old.app"
     if ! mv "$stage/Warper.app" "$bundle"; then
-        mv "$stage/previous.app" "$bundle"
+        mv "$stage/old.app" "$bundle"
         die "could not move the new Warper.app into place; the old one was restored"
     fi
-    placed=
-    if [ ! -e "$previous" ] || mv "$previous" "$stage/older.app"; then
-        mv "$stage/previous.app" "$previous" && placed=1
-    fi
-    if [ -z "$placed" ]; then
-        if [ -e "$stage/older.app" ]; then mv "$stage/older.app" "$previous" || true; fi
-        keep_stage=1
-        echo "warper-update: could not keep the previous version; it is in $stage" >&2
-    fi
-    echo "Installed Warper $latest (previous version: $previous)"
+    # Older updaters kept the previous app here.
+    stale=${bundle%.app}.previous.app
+    rm -rf "$stale" || echo "warper-update: could not remove $stale" >&2
 fi
+
+# The old files only existed to undo a failed swap. The running Warper and this script keep their
+# open files after the unlink, and the relauncher starts the new path. Removing them now, rather
+# than at exit, leaves nothing behind if the terminal is closed at the restart prompt.
+if rm -rf "$stage"; then
+    stage=
+else
+    echo "warper-update: could not remove $stage" >&2
+fi
+echo "Installed Warper $latest"
 
 # Warper passes its own PID when it opens this tab; a script run from another terminal has none.
 if [ -z "${WARPER_PID:-}" ] || ! ask 'Restart Warper now? Open tabs will close.'; then

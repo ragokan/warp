@@ -2,6 +2,7 @@ import hashlib
 import io
 import os
 import re
+import select
 import shutil
 import signal
 import stat
@@ -56,8 +57,8 @@ class UpdateTests(unittest.TestCase):
     def shim(self, name, body):
         write_executable(self.shims / name, "#!/bin/sh\n" + body)
 
-    def run_script(self, answers, script=SCRIPT, **env):
-        environment = {
+    def environment(self, **env):
+        return {
             "PATH": f"{self.shims}:{os.environ['PATH']}",
             "HOME": str(self.root / "home"),
             "WARPER_UPDATE_API": f"file://{self.release}/latest.json",
@@ -65,14 +66,61 @@ class UpdateTests(unittest.TestCase):
             "TMPDIR": str(self.root),
             **env,
         }
+
+    def run_script(self, answers, script=SCRIPT, **env):
         return subprocess.run(
             ["sh", str(script)],
             input=answers,
             text=True,
             capture_output=True,
-            env=environment,
+            env=self.environment(**env),
             timeout=60,
         )
+
+    def start_script(self, script=SCRIPT, **env):
+        process = subprocess.Popen(
+            ["sh", str(script)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            env=self.environment(**env),
+        )
+        # Cleanups run last-in first-out: kill, then reap, then close the pipes.
+        self.addCleanup(process.stdout.close)
+        self.addCleanup(process.stdin.close)
+        self.addCleanup(process.wait)
+        self.addCleanup(process.kill)
+        return process
+
+    def answer(self, process, text):
+        process.stdin.write(text.encode())
+        process.stdin.flush()
+
+    def read_until(self, process, text, timeout=30):
+        seen = ""
+        deadline = time.time() + timeout
+        while text not in seen:
+            remaining = deadline - time.time()
+            self.assertGreater(remaining, 0, f"timed out waiting for {text!r}; got {seen!r}")
+            if select.select([process.stdout], [], [], remaining)[0]:
+                chunk = os.read(process.stdout.fileno(), 4096)
+                self.assertTrue(chunk, f"the script ended before {text!r}; got {seen!r}")
+                seen += chunk.decode()
+        return seen
+
+    def staging_dirs(self, directory):
+        return [p for p in directory.iterdir() if p.name.startswith(".warper-update.")]
+
+    def start_warper(self):
+        running = subprocess.Popen(["sleep", "300"])
+        self.addCleanup(running.kill)
+        return running
+
+    def wait_for(self, path):
+        deadline = time.time() + 20
+        while not path.exists() and time.time() < deadline:
+            time.sleep(0.1)
+        return path.exists()
 
 
 class LinuxUpdateTests(UpdateTests):
@@ -130,15 +178,20 @@ class LinuxUpdateTests(UpdateTests):
         self.assertIn("old", (self.app / "warp-oss").read_text())
         self.assertFalse((self.app / "warp-oss.previous").exists())
 
-    def test_install_keeps_the_previous_binary_and_records_the_version(self):
+    def test_install_replaces_the_binary_and_leaves_no_previous_copy(self):
         self.install_version("0.9.0")
         self.publish("warper-linux-arm64.tar.gz", self.package)
         result = self.run_linux("y\nn\n")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Checksum verified", result.stdout)
+        self.assertIn("Installed Warper 0.10.0\n", result.stdout)
+        self.assertNotIn("previous", result.stdout)
         self.assertIn("next time you launch", result.stdout)
         self.assertIn("new", (self.app / "warp-oss").read_text())
-        self.assertIn("old", (self.app / "warp-oss.previous").read_text())
+        self.assertEqual(
+            sorted(p.name for p in self.app.iterdir()),
+            ["VERSION", "resources", "warp-oss", "warper-update"],
+        )
         self.assertEqual((self.app / "VERSION").read_text(), "0.10.0\n")
         self.assertTrue((self.app / "resources" / "schema.json").exists())
         self.assertFalse((self.app / "resources" / "old.json").exists())
@@ -198,9 +251,6 @@ class LinuxUpdateTests(UpdateTests):
         self.assertIn("/new/VERSION", swapped)
         self.assert_old_install_intact()
 
-    def staging_dirs(self, directory):
-        return [p for p in directory.iterdir() if p.name.startswith(".warper-update.")]
-
     def test_failed_restore_keeps_the_previous_files_and_names_them(self):
         self.install_version("0.9.0")
         self.publish("warper-linux-arm64.tar.gz", self.package)
@@ -220,22 +270,33 @@ class LinuxUpdateTests(UpdateTests):
         self.assertEqual(staged, [kept.parent.resolve()])
         self.assertIn("old", (kept / "warp-oss").read_text())
 
-    def test_failure_placing_the_previous_binary_keeps_it_and_names_it(self):
+    def test_a_previous_binary_from_an_older_updater_is_removed(self):
         self.install_version("0.9.0")
         self.publish("warper-linux-arm64.tar.gz", self.package)
+        write_executable(self.app / "warp-oss.previous", "#!/bin/sh\necho older\n")
+        write_executable(self.app / "warp-oss.lean-v0.2.0", "#!/bin/sh\necho rollback\n")
+        result = self.run_linux("y\nn\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.app / "warp-oss.previous").exists())
+        self.assertIn("rollback", (self.app / "warp-oss.lean-v0.2.0").read_text())
+        self.assertEqual((self.app / "VERSION").read_text(), "0.10.0\n")
+
+    def test_failure_removing_a_stale_previous_binary_only_warns(self):
+        self.install_version("0.9.0")
+        self.publish("warper-linux-arm64.tar.gz", self.package)
+        write_executable(self.app / "warp-oss.previous", "#!/bin/sh\necho older\n")
         self.shim(
-            "mv",
+            "rm",
             'for last; do :; done\n'
-            'case $last in */warp-oss.previous) echo "mv: simulated failure" >&2; exit 1 ;; esac\n'
-            'command -p mv "$@"\n',
+            'case $last in */warp-oss.previous) echo "rm: simulated failure" >&2; exit 1 ;; esac\n'
+            'command -p rm "$@"\n',
         )
         result = self.run_linux("y\nn\n")
         self.assertEqual(result.returncode, 0, result.stderr)
-        match = re.search(r"could not keep the previous binary; it is in (\S+)", result.stderr)
-        self.assertIsNotNone(match, result.stderr)
-        self.assertIn("old", Path(match[1]).read_text())
+        self.assertIn("could not remove", result.stderr)
+        self.assertTrue((self.app / "warp-oss.previous").exists())
         self.assertEqual((self.app / "VERSION").read_text(), "0.10.0\n")
-        self.assertEqual(len(self.staging_dirs(self.prefix / "lib")), 1)
+        self.assertEqual(self.staging_dirs(self.prefix / "lib"), [])
 
     def test_a_symlink_to_the_script_updates_the_install_it_points_into(self):
         self.install_version("0.9.0")
@@ -273,16 +334,41 @@ class LinuxUpdateTests(UpdateTests):
         self.assertIn("SHA256SUMS", result.stderr)
         self.assertIn("old", (self.app / "warp-oss").read_text())
 
-    def start_warper(self):
-        running = subprocess.Popen(["sleep", "300"])
+    def start_installed_warper(self):
+        """Runs a real executable from the installed path, as the running Warper does."""
+        binary = self.app / "warp-oss"
+        binary.unlink()
+        shutil.copy2(shutil.which("sleep"), binary)
+        running = subprocess.Popen([str(binary), "300"])
         self.addCleanup(running.kill)
+        time.sleep(0.5)
+        if running.poll() is not None:
+            self.skipTest("a copied sleep cannot run here")
         return running
 
-    def wait_for(self, path):
-        deadline = time.time() + 20
-        while not path.exists() and time.time() < deadline:
-            time.sleep(0.1)
-        return path.exists()
+    def test_the_old_files_are_gone_at_the_restart_prompt_and_the_new_binary_relaunches(self):
+        self.install_version("0.9.0")
+        self.publish("warper-linux-arm64.tar.gz", self.package)
+        running = self.start_installed_warper()
+        started, restart = self.root / "started", self.root / "restart"
+        script = self.start_script(
+            self.app / "warper-update", WARPER_PID=str(running.pid),
+            WARPER_RESTART_FILE=str(restart), MARKER=str(started),
+        )
+        self.answer(script, "y\n")
+        self.read_until(script, "Restart Warper now? Open tabs will close. [y/N] ")
+        self.assertEqual(self.staging_dirs(self.prefix / "lib"), [])
+        self.assertFalse((self.app / "warp-oss.previous").exists())
+        self.assertIsNone(running.poll(), "Warper died with its binary")
+        if sys.platform.startswith("linux"):
+            self.assertTrue(os.readlink(f"/proc/{running.pid}/exe").endswith("(deleted)"))
+        self.answer(script, "y\n")
+        self.assertEqual(script.wait(timeout=30), 0)
+        self.assertTrue(restart.exists(), "Warper was not asked to quit")
+        self.assertFalse(started.exists(), "the new binary started before Warper exited")
+        running.terminate()
+        running.wait(timeout=20)
+        self.assertTrue(self.wait_for(started), "the new binary was not launched")
 
     def test_restart_waits_for_warper_to_exit_without_signalling_it(self):
         self.install_version("0.9.0")
@@ -426,40 +512,85 @@ class MacosUpdateTests(UpdateTests):
     def run_macos(self, answers, **env):
         return self.run_script(answers, WARPER_APP=str(self.bundle), **env)
 
-    def test_replaces_the_bundle_and_keeps_the_previous_one_beside_it(self):
-        older = self.applications / "Warper.previous.app" / "Contents"
-        older.mkdir(parents=True)
-        (older / "marker").write_text("older\n")
+    def stale_previous_bundle(self):
+        stale = self.applications / "Warper.previous.app" / "Contents"
+        stale.mkdir(parents=True)
+        (stale / "marker").write_text("older\n")
+        return stale.parent
+
+    def test_replaces_the_bundle_and_leaves_no_previous_copy(self):
+        self.publish("warper-macos-arm64.zip", self.package)
+        result = self.run_macos("y\nn\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Installed Warper 0.10.0\n", result.stdout)
+        self.assertNotIn("previous", result.stdout)
+        self.assertEqual((self.bundle / "Contents" / "marker").read_text(), "new\n")
+        self.assertEqual([path.name for path in self.applications.iterdir()], ["Warper.app"])
+
+    def test_a_previous_bundle_from_an_older_updater_is_removed(self):
+        self.stale_previous_bundle()
+        other = self.applications / "Other.previous.app"
+        other.mkdir()
         self.publish("warper-macos-arm64.zip", self.package)
         result = self.run_macos("y\nn\n")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.bundle / "Contents" / "marker").read_text(), "new\n")
-        previous = self.applications / "Warper.previous.app"
-        self.assertEqual((previous / "Contents" / "marker").read_text(), "old\n")
         self.assertEqual(
             sorted(path.name for path in self.applications.iterdir()),
-            ["Warper.app", "Warper.previous.app"],
+            ["Other.previous.app", "Warper.app"],
         )
 
-    def test_failure_placing_the_previous_bundle_keeps_both_old_copies(self):
-        older = self.applications / "Warper.previous.app" / "Contents"
-        older.mkdir(parents=True)
-        (older / "marker").write_text("older\n")
+    def test_failure_removing_a_stale_previous_bundle_only_warns(self):
+        stale = self.stale_previous_bundle()
+        self.publish("warper-macos-arm64.zip", self.package)
+        self.shim(
+            "rm",
+            'for last; do :; done\n'
+            'case $last in */Warper.previous.app) echo "rm: simulated failure" >&2; exit 1 ;; esac\n'
+            'command -p rm "$@"\n',
+        )
+        result = self.run_macos("y\nn\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("could not remove", result.stderr)
+        self.assertEqual((stale / "Contents" / "marker").read_text(), "older\n")
+        self.assertEqual((self.bundle / "Contents" / "marker").read_text(), "new\n")
+        self.assertEqual(self.staging_dirs(self.applications), [])
+
+    def test_failure_moving_the_new_bundle_in_restores_the_old_one(self):
         self.publish("warper-macos-arm64.zip", self.package)
         self.shim(
             "mv",
-            'for last; do :; done\n'
-            'case $1 in */previous.app) case $last in */Warper.previous.app)\n'
-            '  echo "mv: simulated failure" >&2; exit 1 ;; esac ;; esac\n'
+            'case $1 in */.warper-update.*/Warper.app) echo "mv: simulated failure" >&2; exit 1 ;; esac\n'
             'command -p mv "$@"\n',
         )
-        result = self.run_macos("y\nn\n")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((self.bundle / "Contents" / "marker").read_text(), "new\n")
-        self.assertEqual((older / "marker").read_text(), "older\n")
-        match = re.search(r"could not keep the previous version; it is in (\S+)", result.stderr)
-        self.assertIsNotNone(match, result.stderr)
-        self.assertEqual((Path(match[1]) / "previous.app" / "Contents" / "marker").read_text(), "old\n")
+        result = self.run_macos("y\ny\n")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("the old one was restored", result.stderr)
+        self.assertEqual((self.bundle / "Contents" / "marker").read_text(), "old\n")
+        self.assertEqual([path.name for path in self.applications.iterdir()], ["Warper.app"])
+
+    def test_the_old_bundle_is_gone_at_the_restart_prompt_and_the_new_one_opens(self):
+        self.publish("warper-macos-arm64.zip", self.package)
+        self.shim("open", 'echo "$@" > "$OPEN_LOG"\n')
+        opened, restart = self.root / "opened", self.root / "restart"
+        running = self.start_warper()
+        script = self.start_script(
+            SCRIPT, WARPER_APP=str(self.bundle), WARPER_PID=str(running.pid),
+            WARPER_RESTART_FILE=str(restart), OPEN_LOG=str(opened),
+        )
+        self.answer(script, "y\n")
+        self.read_until(script, "Restart Warper now? Open tabs will close. [y/N] ")
+        self.assertEqual(self.staging_dirs(self.applications), [])
+        self.assertEqual([path.name for path in self.applications.iterdir()], ["Warper.app"])
+        self.answer(script, "y\n")
+        self.assertEqual(script.wait(timeout=30), 0)
+        self.assertTrue(restart.exists(), "Warper was not asked to quit")
+        running.terminate()
+        running.wait(timeout=20)
+        self.assertTrue(self.wait_for(opened), "the new bundle was not opened")
+        self.assertTrue(self.wait_for(opened))
+        time.sleep(0.5)
+        self.assertEqual(opened.read_text().strip(), str(self.bundle))
 
     def test_checksum_mismatch_keeps_the_installed_bundle(self):
         self.publish("warper-macos-arm64.zip", self.package, corrupt=True)

@@ -1,5 +1,10 @@
 # Lean build progress
 
+## 2026-10-22 — updater keeps no previous copy
+
+- `warper-update` no longer leaves `warp-oss.previous` / `Warper.previous.app`: the old files live only in the hidden `.warper-update.*` stage while the swap can still be rolled back, and the stage is deleted as soon as the new install is in place (before the restart prompt, so closing the terminal there cannot leak the old binary; the EXIT trap stays as the fallback). A leftover from an older updater is removed (exact paths only; a failed removal only warns). The relauncher still starts the new path.
+- Tests: 8 of 30 in `warper_update_tests.py` failed against the old script (flipped install expectations, stale-copy removal and warn-only failure on both platforms, stage gone at the restart prompt while a real process runs from the deleted binary and the new one relaunches), 30 of 30 pass now, also under `bash --posix`. The rollback and keep_stage tests are unchanged; a macOS "new bundle could not be moved in" rollback test was added. Known edge (not exercised): an old Warper that declined the restart probably cannot run Check for Updates again until restarted, because its executable path is gone.
+
 ## 2026-10-22 — update restart without the Quit dialog
 
 - The restart marker now quits with `TerminationMode::ForceTerminate` (the mode behind the dialog's own "Yes, quit"; same shutdown path) unless a code editor or review has unsaved changes, then it stays `Cancellable`. Before, the update tab's own command could still be running when the marker was polled and raised "Quit Warp? You have 1 process running" (seen on the real 0.3.0 → 0.3.1 update); a dialog left open for 60 s made the relauncher give up.
