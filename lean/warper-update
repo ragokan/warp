@@ -177,9 +177,10 @@ fi
 echo "Installed Warper $latest"
 
 # Detached helper: waits for Warper's PID to exit, deletes the old binary ($3, if any) and then, if
-# that took at most $2 half-seconds, runs the rest of its arguments. It sends no signal. Warper
-# kills the process group of a finished command, so it needs its own session.
-helper='n=0; while kill -0 "$1" 2>/dev/null; do n=$((n + 1)); [ "$n" -le "$2" ] || [ -n "$3" ] || exit 0; sleep 0.5; done; unset WARPER_PID WARPER_RESTART_FILE; [ -z "$3" ] || rm -f "$3"; [ "$n" -le "$2" ] || exit 0; shift 3; [ "$#" -eq 0 ] || exec "$@"'
+# that took at most $2 half-seconds, runs the rest of its arguments. Without arguments it waits
+# indefinitely and only deletes. It sends no signal. Warper kills the process group of a finished
+# command, so it needs its own session.
+helper='n=0; while kill -0 "$1" 2>/dev/null; do n=$((n + 1)); [ "$n" -le "$2" ] || [ "$#" -eq 3 ] || exit 0; sleep 0.5; done; unset WARPER_PID WARPER_RESTART_FILE; [ -z "$3" ] || rm -f "$3"; [ "$#" -gt 3 ] && [ "$n" -le "$2" ] || exit 0; shift 3; exec "$@"'
 spawn_helper() {
     set -- sh -c "$helper" sh "$WARPER_PID" "$@"
     if command -v setsid >/dev/null 2>&1; then
@@ -195,8 +196,9 @@ if [ -z "${WARPER_PID:-}" ]; then
     echo "Warper $latest will start the next time you launch it."
     exit 0
 fi
+# Started before the prompt, so closing the tab there cannot leave the old binary behind.
+[ -z "$old" ] || spawn_helper 0 "$old"
 if ! ask 'Restart Warper now? Open tabs will close.'; then
-    [ -z "$old" ] || spawn_helper 0 "$old"
     echo "Warper $latest will start the next time you launch it."
     exit 0
 fi

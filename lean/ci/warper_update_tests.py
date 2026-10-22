@@ -122,6 +122,17 @@ class UpdateTests(unittest.TestCase):
             time.sleep(0.1)
         return path.exists()
 
+    def helper_pids(self, running):
+        """The detached helpers waiting for this process to exit."""
+        processes = subprocess.run(
+            ["ps", "-axo", "pid=,command="], text=True, capture_output=True, check=True
+        ).stdout.splitlines()
+        return [
+            int(line.split()[0])
+            for line in processes
+            if "kill -0" in line and str(running.pid) in line.split(None, 1)[1]
+        ]
+
     def wait_until_gone(self, path):
         deadline = time.time() + 20
         while path.exists() and time.time() < deadline:
@@ -412,6 +423,26 @@ class LinuxUpdateTests(UpdateTests):
         self.assertEqual(self.staging_dirs(self.prefix / "lib"), [])
         self.assertIn("new", (self.app / "warp-oss").read_text())
 
+    def test_closing_the_tab_at_the_restart_prompt_still_removes_the_old_binary(self):
+        self.install_version("0.9.0")
+        self.publish("warper-linux-arm64.tar.gz", self.package)
+        running = self.start_installed_warper()
+        script = self.start_script(self.app / "warper-update", WARPER_PID=str(running.pid))
+        self.answer(script, "y\n")
+        self.read_until(script, "Restart Warper now? Open tabs will close. [y/N] ")
+        script.send_signal(signal.SIGHUP)
+        script.wait(timeout=30)
+        time.sleep(1.5)
+        self.assertTrue((self.app / ".warp-oss.old").exists(), "removed while Warper still runs")
+        running.terminate()
+        running.wait(timeout=20)
+        self.assertTrue(self.wait_until_gone(self.app / ".warp-oss.old"))
+        deadline = time.time() + 10
+        while self.helper_pids(running) and time.time() < deadline:
+            time.sleep(0.1)
+        self.assertEqual(self.helper_pids(running), [])
+        self.assertEqual(self.staging_dirs(self.prefix / "lib"), [])
+
     def test_without_a_warper_pid_the_old_binary_stays_until_the_next_update(self):
         self.install_version("0.9.0")
         self.publish("warper-linux-arm64.tar.gz", self.package)
@@ -475,7 +506,7 @@ class LinuxUpdateTests(UpdateTests):
         self.assertIsNone(running.poll(), "Warper was signalled")
         self.assertFalse(started.exists())
 
-    def test_relauncher_gets_its_own_session_without_setsid(self):
+    def test_helpers_get_their_own_session_without_setsid(self):
         self.install_version("0.9.0")
         self.publish("warper-linux-arm64.tar.gz", self.package)
         tools = self.root / "tools"
@@ -490,19 +521,13 @@ class LinuxUpdateTests(UpdateTests):
             MARKER=str(self.root / "started"),
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        processes = subprocess.run(
-            ["ps", "-axo", "pid=,command="], text=True, capture_output=True, check=True
-        ).stdout.splitlines()
-        relauncher = [
-            int(line.split()[0])
-            for line in processes
-            if "kill -0" in line and str(running.pid) in line.split(None, 1)[1]
-        ]
-        self.assertEqual(len(relauncher), 1)
+        helpers = self.helper_pids(running)
+        self.assertEqual(len(helpers), 2, "expected the old-binary cleanup and the relauncher")
         deadline = time.time() + 10
-        while os.getsid(relauncher[0]) != relauncher[0] and time.time() < deadline:
+        while any(os.getsid(pid) != pid for pid in helpers) and time.time() < deadline:
             time.sleep(0.1)
-        self.assertEqual(os.getsid(relauncher[0]), relauncher[0])
+        for pid in helpers:
+            self.assertEqual(os.getsid(pid), pid)
         running.terminate()
         running.wait(timeout=20)
 

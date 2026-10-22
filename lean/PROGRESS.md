@@ -1,5 +1,10 @@
 # Lean build progress
 
+## 2026-10-22 — updater: old-binary cleanup starts before the restart prompt
+
+- Re-review: with `WARPER_PID` set, closing the update tab at "Restart now?" sends SIGHUP and kills the script before either helper started, leaving `.warp-oss.old` (~262 MB) until the next update. The cleanup-only waiter (no command, waits indefinitely, `rm -f` the old binary) now starts before the prompt; an accepted restart still starts the relauncher, which gives up at its limit and removes the file itself before starting the new binary (a second `rm -f` is harmless).
+- Tests: 2 of 35 failed against the previous commit (new SIGHUP-at-the-prompt test; the own-session test now expects both helpers), 35 of 35 pass (also under `bash --posix`), whole `lean/ci` suite 39 of 39.
+
 ## 2026-10-22 — updater: keep the running Linux binary resolvable, keep the macOS recovery copy
 
 - Review of the previous commit: on Linux, deleting the old binary made `/proc/self/exe` read `<stage>/old/warp-oss (deleted)`, and `current_exe()` callers (updater script lookup, `bundled_resources_dir`, ripgrep self re-exec, crash recovery) failed in the old Warper until it restarted. Now the old binary is renamed to `$app/.warp-oss.old` inside the install, so its parent is still the new install; a detached helper (own session, `kill -0` only) deletes it when the old PID exits. With a restart it does so before starting the new binary; without one it waits indefinitely; without `WARPER_PID` the file stays and the next update replaces it. The rest of the stage is still deleted at once. macOS is unaffected (`current_exe` is the launch path, already the new bundle) and still deletes immediately.

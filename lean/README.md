@@ -152,8 +152,9 @@ installs.
   old files are deleted, so no previous copy remains (a `warp-oss.previous` left by an older
   updater is removed too). Linux keeps the old binary, hidden as `.warp-oss.old` inside the
   install, only until the old Warper exits, so that Warper still finds the new resources and
-  updater through its own path; a detached waiter deletes it when that PID is gone (a run from
-  another terminal has no PID and leaves it for the next update to replace). If it cannot
+  updater through its own path; a detached waiter, started before the restart prompt so closing
+  the tab there is harmless, deletes it when that PID is gone (a run from another terminal has no
+  PID and leaves it for the next update to replace). If it cannot
   restore the old files it leaves them in the hidden `.warper-update.*` folder next to the
   install and prints the path. If an update is interrupted (a SIGKILL or power loss between the renames), the
   previous files are in that folder; move them back. The script finds its install through
