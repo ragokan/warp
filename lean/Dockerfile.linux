@@ -11,3 +11,6 @@ USER builder
 ENV PATH=/home/builder/.cargo/bin:$PATH
 RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.92.0
 WORKDIR /work
+# Parallel rustc frontend for workspace crates only (see the script). CI does not use this image.
+COPY rustc-wrapper /usr/local/bin/rustc-wrapper
+ENV RUSTC_WRAPPER=/usr/local/bin/rustc-wrapper

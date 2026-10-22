@@ -1,5 +1,12 @@
 # Lean build progress
 
+## 2026-10-22 — builder: parallel rustc frontend for workspace crates
+
+- `lean/rustc-wrapper` (set as `RUSTC_WRAPPER` by `lean/Dockerfile.linux` only; CI does not use that image) adds `RUSTC_BOOTSTRAP=1 -Zthreads=${LEAN_RUSTC_THREADS:-8}` to workspace-crate compiles, recognised by `CARGO_MANIFEST_DIR` under `/work` plus `CARGO_CRATE_NAME` (set for compiles, not for build-script runs). A logging copy over a cold `cargo check -p asset_macro` showed 4 of 125 invocations touched (the workspace crates) and every registry crate, `rustc -vV` probe and proc-macro2/anyhow build-script probe passed through without `RUSTC_BOOTSTRAP`. Cargo fingerprints are unchanged: after a no-wrapper build, wrapper on and wrapper off were both `Fresh` (6.7 s and 0.8 s).
+- Measured on the warm lean target, `touch app/src/lib.rs` first, containers capped at `--memory=32g`, other load on the host (load average 4–19, see `/tmp/warp-lean-evidence/offline/cores/results.jsonl`): `cargo check -p warp --lib` 105–116 s at 1.0 core and 6.3 GB → 57–59 s at 2.4 cores and 6.75 GB with 8 threads (69 s, 6.6 GB with 4); `lean/build.sh` 487 s at 6.3 cores → 363 s at 8.6 cores, the `warp` lib rustc 267 s → 162 s, max RSS 15.4 → 16.5 GB (`warp_oss` link 16.4 → 16.2 GB). Earlier uncapped pairs under heavier load: build 717 s → 340 s and 521 s → 388 s, so the build gain is 25–45 % depending on load. No ICE or deadlock in the wrapper-compiled workspace crates.
+- Jobserver: with `CARGO_BUILD_JOBS=1` the `warp` check stayed at 1.0 core and 117 s (the frontend threads draw from the same jobserver); with 16 it took 58 s. Keep jobs at 8 or more.
+- Docker runs of the builder now carry `--memory=32g --memory-swap=32g` (README); the frontend threads add about 0.45 GB (check) to 1.1 GB (build) at the peak.
+
 ## 2026-10-22 — updater: old-binary cleanup starts before the restart prompt
 
 - Re-review: with `WARPER_PID` set, closing the update tab at "Restart now?" sends SIGHUP and kills the script before either helper started, leaving `.warp-oss.old` (~262 MB) until the next update. The cleanup-only waiter (no command, waits indefinitely, `rm -f` the old binary) now starts before the prompt; an accepted restart still starts the relauncher, which gives up at its limit and removes the file itself before starting the new binary (a second `rm -f` is harmless).

@@ -1,0 +1,14 @@
+#!/bin/sh
+# Workspace crates get rustc's parallel frontend (the stable frontend is single-threaded and `warp`
+# is one huge crate); registry, git and probe invocations run untouched, since RUSTC_BOOTSTRAP
+# would make probes like proc-macro2's and anyhow's pick nightly code paths.
+case ${CARGO_MANIFEST_DIR:-} in
+    /work | /work/*)
+        if [ -n "${CARGO_CRATE_NAME:-}" ]; then
+            RUSTC_BOOTSTRAP=1
+            export RUSTC_BOOTSTRAP
+            exec "$@" "-Zthreads=${LEAN_RUSTC_THREADS:-8}"
+        fi
+        ;;
+esac
+exec "$@"

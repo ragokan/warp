@@ -27,11 +27,26 @@ On this Linux arm64 machine, build only in Docker:
 ```sh
 docker build -f lean/Dockerfile.linux -t warp-lean-builder lean
 docker run --rm --name warp-lean-build \
+  --memory=32g --memory-swap=32g \
   -v "$PWD:/work" \
   -v warp-lean-registry:/home/builder/.cargo/registry \
   -v warp-lean-git:/home/builder/.cargo/git \
   -e CARGO_BUILD_JOBS=12 warp-lean-builder lean/build.sh
 ```
+
+Always pass `--memory=32g --memory-swap=32g` and run one build container at a time: the lean build
+of the `warp` crate alone peaks at about 16 GB in one `rustc` (6.8 GB for `cargo check`), `/tmp`
+may be RAM-backed, and an uncapped container can get other processes OOM-killed. If a run exits with 137 it hit the cap:
+lower `LEAN_RUSTC_THREADS` (the threads add 0.5–1 GB at 8) or, for cold builds that run several
+heavy crates at once, `CARGO_BUILD_JOBS`. Keep `CARGO_BUILD_JOBS` at 8 or more: the frontend
+threads draw from the same jobserver, and with `CARGO_BUILD_JOBS=1` the wrapper gave no speedup.
+
+The image sets `RUSTC_WRAPPER=/usr/local/bin/rustc-wrapper` (`lean/rustc-wrapper`). It gives crates
+under `/work` rustc's parallel frontend (`RUSTC_BOOTSTRAP=1 -Zthreads=8`, because the stable
+frontend is single-threaded and `warp` is one huge crate); registry and git crates, cargo's version
+probes and build-script probes run untouched. Change the thread count with `-e
+LEAN_RUSTC_THREADS=4`, or turn the wrapper off with `-e RUSTC_WRAPPER=`. The wrapper does not
+change Cargo's fingerprints, so it can be toggled without rebuilding. CI does not use this image.
 
 New Docker volumes can be root-owned. If Cargo reports permission denied on its caches, correct
 ownership of those two volumes to uid/gid 1000. Never mount over `.cargo` or `.rustup`; that would
