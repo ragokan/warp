@@ -250,3 +250,17 @@ if FeatureFlag::YourNewFeature.is_enabled() {
 ### Exhaustive Matching
 
 When adding/editing match statements, avoid using the wildcard _ when at all possible. Exhaustive matching is helpful for ensuring that all variants are handled, especially when adding new variants to enums in the future.
+
+## Warper (`lean` branch)
+
+The `lean` branch is Warper, a terminal-only fork built with the `lean` Cargo feature and kept rebased on upstream with `lean/sync.sh`. When working on it, read these first; they take precedence over upstream guidance above where they differ:
+- `lean/README.md`: build and install, the per-file patch table (`## Patches`) and the ungated fixes.
+- `lean/PROGRESS.md`: the working log, newest entry first. The top entries describe the current state, measurements and open items.
+- `lean/VERIFICATION.md`: what was verified, how, and what was not.
+
+Conventions:
+- Gate behavior changes with `cfg!(feature = "lean")` in `app` and `warpui_core::lean::IS_LEAN` in other crates, so default builds stay unchanged. Only behavior-preserving fixes go ungated, and they are listed under "Ungated performance fixes" in `lean/README.md`.
+- A test for a gate asserts against `cfg!(feature = "lean")` or `IS_LEAN`, runs in both builds, and is shown to fail without the change.
+- Every change gets a dated entry at the top of `lean/PROGRESS.md` (what, why, measurements, tests, what remains unverified) and a row in the `lean/README.md` patch table.
+- Build and test only in the Docker builder described under "Build" in `lean/README.md`, one container at a time.
+- macOS cannot be built or run on the Linux host. macOS-only code is compiled by the macOS release CI or on a Mac, and every macOS claim states whether it was measured there.
