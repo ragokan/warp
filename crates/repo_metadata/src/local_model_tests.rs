@@ -3685,3 +3685,48 @@ fn lazy_root_created_directory_inserted_as_placeholder() {
         );
     });
 }
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn detected_git_repositories_are_indexed_except_in_lean() {
+    use crate::repositories::{RepoDetectionSource, stub_git_repository};
+
+    VirtualFS::test(
+        "detected_git_repositories_are_indexed_except_in_lean",
+        |dirs, mut vfs| {
+            stub_git_repository(&mut vfs, "repo");
+            vfs.with_files(vec![Stub::FileWithContent(
+                "repo/main.rs",
+                "fn main() {}\n",
+            )]);
+            let repo_root = dirs.tests().join("repo");
+
+            App::test((), |mut app| async move {
+                app.add_singleton_model(DirectoryWatcher::new_for_testing);
+                let detected_repositories =
+                    app.add_singleton_model(|_| DetectedRepositories::default());
+                let model_handle = app.add_model(LocalRepoMetadataModel::new);
+
+                let detected_root = detected_repositories
+                    .update(&mut app, |detected_repositories, ctx| {
+                        detected_repositories.detect_possible_local_git_repo(
+                            repo_root.to_str().unwrap(),
+                            RepoDetectionSource::TerminalNavigation,
+                            ctx,
+                        )
+                    })
+                    .with_timeout(Duration::from_secs(5))
+                    .await
+                    .expect("timed out detecting the repository");
+                assert!(
+                    detected_root.is_some(),
+                    "the stub should be detected as a repository"
+                );
+
+                let is_indexing =
+                    model_handle.read(&app, |model, _| !model.repositories.is_empty());
+                assert_eq!(is_indexing, !warpui_core::lean::IS_LEAN);
+            });
+        },
+    );
+}

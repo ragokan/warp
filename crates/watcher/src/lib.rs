@@ -148,26 +148,61 @@ fn ensure_watchable_path(path: &Path) -> Result<PathBuf> {
 /// The updates are debounced with a configurable duration.
 pub struct BulkFilesystemWatcher {
     tx: mpsc::Sender<BackgroundFileWatcherCommand>,
+    /// What the background thread needs, held until the first path command. The debouncer's
+    /// thread wakes every quarter of the debounce duration whether or not anything is watched,
+    /// so a watcher that never watches a path should not start it.
+    pending_start: Option<PendingStart>,
+}
+
+struct PendingStart {
+    debounce_duration: Duration,
+    handler: WatcherEventHandler,
+    rx: mpsc::Receiver<BackgroundFileWatcherCommand>,
 }
 
 impl BulkFilesystemWatcher {
     pub fn new(debounce_duration: Duration, ctx: &mut ModelContext<Self>) -> Self {
         let (tx, rx) = async_channel::unbounded();
         let (bg_tx, bg_rx) = channel();
+        ctx.spawn_stream_local(rx, Self::handle_watcher_event, |_, _| {});
+
+        Self {
+            tx: bg_tx,
+            pending_start: Some(PendingStart {
+                debounce_duration,
+                handler: WatcherEventHandler { tx },
+                rx: bg_rx,
+            }),
+        }
+    }
+
+    pub fn new_for_test() -> Self {
+        let (bg_tx, _) = channel();
+        Self {
+            tx: bg_tx,
+            pending_start: None,
+        }
+    }
+
+    fn start_background_watcher_if_needed(&mut self) {
+        let Some(PendingStart {
+            debounce_duration,
+            handler,
+            rx,
+        }) = self.pending_start.take()
+        else {
+            return;
+        };
 
         // Note that we keep the file watcher in the background since registering and unregistering file path
         // involves fs calls.
         if let Err(e) = thread::Builder::new()
             .name("Bulk Filesystem Watcher".into())
             .spawn(move || {
-                match BackgroundFileWatcher::new(
-                    debounce_duration,
-                    WatcherEventHandler { tx },
-                    bg_rx,
-                ) {
+                match BackgroundFileWatcher::new(debounce_duration, handler, rx) {
                     Ok(watcher) => watcher.run(),
                     Err(e) => {
-                        // The thread exits, which drops `bg_rx` and the
+                        // The thread exits, which drops `rx` and the
                         // event-channel sender. Subsequent `register_path` /
                         // `unregister_path` calls will get `SendError` and
                         // log a warning — the app continues without file
@@ -182,14 +217,6 @@ impl BulkFilesystemWatcher {
         {
             report_error!(e);
         }
-        ctx.spawn_stream_local(rx, Self::handle_watcher_event, |_, _| {});
-
-        Self { tx: bg_tx }
-    }
-
-    pub fn new_for_test() -> Self {
-        let (bg_tx, _) = channel();
-        Self { tx: bg_tx }
     }
 
     /// Stop watching a path. The returned future resolves once the path is fully unregistered.
@@ -197,6 +224,7 @@ impl BulkFilesystemWatcher {
     pub fn unregister_path(&mut self, path: &Path) -> impl Future<Output = Result<()>> + use<> {
         let (tx, rx) = oneshot::channel();
         let send_result = ensure_watchable_path(path).and_then(|path| {
+            self.start_background_watcher_if_needed();
             self.tx
                 .send(BackgroundFileWatcherCommand::RemovePath { path, response: tx })
                 .map_err(anyhow::Error::new)
@@ -223,6 +251,7 @@ impl BulkFilesystemWatcher {
     ) -> impl Future<Output = Result<()>> + use<> {
         let (tx, rx) = oneshot::channel();
         let send_result = ensure_watchable_path(path).and_then(|path| {
+            self.start_background_watcher_if_needed();
             self.tx
                 .send(BackgroundFileWatcherCommand::AddPath {
                     path,

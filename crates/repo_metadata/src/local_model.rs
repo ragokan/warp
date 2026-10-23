@@ -400,15 +400,20 @@ impl LocalRepoMetadataModel {
                 ctx.subscribe_to_model(&watcher, |me, _, event, ctx| me.handle_watcher_event(event, ctx));
                 model.watcher = Some(watcher);
 
-                ctx.subscribe_to_model(&DetectedRepositories::handle(ctx), |me, _, event, ctx| {
-                    let DetectedRepositoriesEvent::DetectedGitRepo { repository, .. } = event;
-                    let repo_path = repository.as_ref(ctx).root_dir().clone();
-                    if let Err(e) = me.index_directory(repository.clone(), ctx) {
-                        log::warn!(
-                            "Failed to index directory {repo_path}: {e}"
-                        );
-                    }
-                });
+                // Lean shows nothing that reads the index (the file tree, the `@` menu,
+                // command-palette file search and AI context are all off), and indexing walks
+                // every file of each repository a session enters and watches the whole tree.
+                if !warpui_core::lean::IS_LEAN {
+                    ctx.subscribe_to_model(&DetectedRepositories::handle(ctx), |me, _, event, ctx| {
+                        let DetectedRepositoriesEvent::DetectedGitRepo { repository, .. } = event;
+                        let repo_path = repository.as_ref(ctx).root_dir().clone();
+                        if let Err(e) = me.index_directory(repository.clone(), ctx) {
+                            log::warn!(
+                                "Failed to index directory {repo_path}: {e}"
+                            );
+                        }
+                    });
+                }
             }
         }
 

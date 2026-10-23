@@ -26,14 +26,19 @@ impl HomeDirectoryWatcher {
         });
         ctx.subscribe_to_model(&watcher, Self::handle_fs_event);
 
-        // Register the home directory as a non-recursive watch.
-        watcher.update(ctx, |watcher, _ctx| {
-            std::mem::drop(watcher.register_path(
-                &home_dir,
-                WatchFilter::accept_all(),
-                RecursiveMode::NonRecursive,
-            ));
-        });
+        // Lean has no subscriber that acts on home-directory changes (MCP config, skills and global
+        // rules are AI features). On macOS a non-recursive watch is still an FSEvents stream over
+        // the whole home tree, so every write anywhere under it would wake the watcher.
+        if !warpui_core::lean::IS_LEAN {
+            // Register the home directory as a non-recursive watch.
+            watcher.update(ctx, |watcher, _ctx| {
+                std::mem::drop(watcher.register_path(
+                    &home_dir,
+                    WatchFilter::accept_all(),
+                    RecursiveMode::NonRecursive,
+                ));
+            });
+        }
 
         Self { _watcher: watcher }
     }
@@ -60,3 +65,7 @@ impl Entity for HomeDirectoryWatcher {
 }
 
 impl SingletonEntity for HomeDirectoryWatcher {}
+
+#[cfg(test)]
+#[path = "home_watcher_tests.rs"]
+mod tests;
