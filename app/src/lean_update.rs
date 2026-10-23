@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use warp_core::paths::state_dir;
@@ -42,6 +42,36 @@ pub fn open_update_tab(workspace: &mut Workspace, ctx: &mut ViewContext<Workspac
         ctx,
     );
     quit_when_restart_requested(marker, POLLS, ctx);
+}
+
+/// The installed Warper version, such as `v0.3.5`, read once from where packaging records it and
+/// `warper-update` reads it. `None` for a source build, which records none.
+pub fn installed_version() -> Option<&'static str> {
+    static VERSION: OnceLock<Option<String>> = OnceLock::new();
+    VERSION
+        .get_or_init(|| {
+            let exe = std::env::current_exe().ok()?;
+            installed_version_at(&exe, cfg!(target_os = "macos"))
+        })
+        .as_deref()
+}
+
+/// Reads `CFBundleShortVersionString` from the app bundle's `Info.plist` on macOS, else the
+/// `VERSION` file next to the executable.
+fn installed_version_at(exe: &Path, in_app_bundle: bool) -> Option<String> {
+    let dir = exe.parent()?;
+    let version = if in_app_bundle {
+        plist::Value::from_file(dir.join("../Info.plist"))
+            .ok()?
+            .as_dictionary()?
+            .get("CFBundleShortVersionString")?
+            .as_string()?
+            .to_owned()
+    } else {
+        fs::read_to_string(dir.join("VERSION")).ok()?
+    };
+    let version = version.trim();
+    (!version.is_empty()).then(|| format!("v{version}"))
 }
 
 /// The script sits next to the executable, or in the app bundle's `Resources` on macOS.

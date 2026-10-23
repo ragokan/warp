@@ -72,7 +72,15 @@ impl SettingsWidget for AboutPageWidget {
             "bundled/svg/warp-logo-with-dark-title.svg"
         };
 
-        let version = ChannelState::app_version().unwrap_or("v#.##.###");
+        // Lean compiles no release version into the binary; packaging records it beside it.
+        let installed_version = if cfg!(feature = "lean") {
+            crate::lean_update::installed_version()
+        } else {
+            None
+        };
+        let version = installed_version
+            .or_else(ChannelState::app_version)
+            .unwrap_or("v#.##.###");
 
         let version_text = ui_builder
             .span(version.to_string())

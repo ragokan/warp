@@ -1,5 +1,11 @@
 # Lean build progress
 
+## 2026-10-23 — version on the About page
+
+- The About page showed the placeholder `v#.##.###` (seen on 0.3.4): lean compiles no release version into the binary (`GIT_RELEASE_TAG` is set only while packaging, c13eb5653), and the page read only the compiled-in `ChannelState::app_version()`. Under lean it shows `lean_update::installed_version()`, read once per run from where packaging records the version and `warper-update` reads it: `CFBundleShortVersionString` in the app bundle's `Info.plist` on macOS (through the existing `plist` dependency), else `VERSION` next to the executable (the Linux archive and `install-linux.sh` put it there). The copy button copies the same text. A source build records neither and keeps the placeholder; CI branch builds show v0.1.0.
+- Tests: `installed_version_is_read_next_to_the_linux_binary`, `installed_version_is_read_from_the_macos_bundle_plist` (an XML plist like the one `bundle-macos.sh` writes) and `a_source_build_has_no_installed_version` (also an empty `VERSION`); `lean_update` 8/8 under lean. Lean Clippy reports nothing in the changed files; default-feature `cargo check -p warp --lib` passes.
+- Checked on the Linux desktop: the lean release binary with `VERSION` = `0.3.5` beside it, isolated XDG directories, Settings (Ctrl+,) → About shows `v0.3.5`. That launch's log also has the `Startup timing:` line (settings 111 ms). Not checked: the macOS About page (same function, read from the bundle plist).
+
 ## 2026-10-23 — faster macOS startup: icon write, launch work, startup timing in the log
 
 - Findings that set the scope (code reading plus passive checks of the installed 0.3.3 on the user's Mac, which is this branch's HEAD 46e1a9955): the database there is tiny (12 blocks, 20 commands, one window), so session restore and the full startup SQLite read are not the cost; the log could not say what is, because file timestamps had whole seconds (every recent launch reached the first `Bootstrapped` 1-2 s after the first line). Kept as-is after checking: the Metal library is precompiled and loaded from memory, and the terminal server is spawned at the very start of `run_internal`, in parallel with the rest of startup.
