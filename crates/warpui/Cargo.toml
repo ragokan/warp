@@ -32,6 +32,9 @@ settings_value = ["warpui_core/settings_value"]
 # Enables utilities for testing.
 test-util = ["warpui_core/test-util"]
 experimental-wgpu-renderer = ["dep:wgpu", "dep:bytemuck", "dep:version-compare"]
+# Links AVFoundation on macOS to read the microphone permission voice input needs. Without it the
+# permission always reads as not determined, and the framework is not loaded at launch.
+microphone_access = ["dep:objc2-av-foundation"]
 
 [dependencies]
 warp_errors.workspace = true
@@ -104,7 +107,10 @@ objc2-app-kit = { workspace = true, features = [
     "NSWindow",
     "objc2-quartz-core",
 ] }
-objc2-av-foundation = { workspace = true, features = ["AVCaptureDevice", "AVMediaFormat"] }
+objc2-av-foundation = { workspace = true, optional = true, features = [
+    "AVCaptureDevice",
+    "AVMediaFormat",
+] }
 objc2-core-foundation.workspace = true
 objc2-foundation = { workspace = true, features = [
     "NSArray",

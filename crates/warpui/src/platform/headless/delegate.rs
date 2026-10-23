@@ -2,7 +2,7 @@ use std::mem::ManuallyDrop;
 use std::sync::{Arc, OnceLock};
 use std::thread;
 
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "microphone_access"))]
 use objc2_av_foundation::{AVAuthorizationStatus, AVCaptureDevice, AVMediaTypeAudio};
 use parking_lot::Mutex;
 
@@ -11,7 +11,7 @@ use crate::clipboard::InMemoryClipboard;
 use crate::notification::{NotificationSendError, RequestPermissionsOutcome};
 use crate::platform::{self, Cursor};
 
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "microphone_access"))]
 fn macos_microphone_access_state() -> platform::MicrophoneAccessState {
     let media_type = unsafe { AVMediaTypeAudio };
     let Some(media_type) = media_type else {
@@ -204,9 +204,13 @@ impl platform::Delegate for AppDelegate {
         if !self.query_microphone_access {
             return platform::MicrophoneAccessState::Denied;
         }
-        #[cfg(target_os = "macos")]
+        #[cfg(all(target_os = "macos", feature = "microphone_access"))]
         {
             macos_microphone_access_state()
+        }
+        #[cfg(all(target_os = "macos", not(feature = "microphone_access")))]
+        {
+            platform::MicrophoneAccessState::NotDetermined
         }
         #[cfg(not(target_os = "macos"))]
         {

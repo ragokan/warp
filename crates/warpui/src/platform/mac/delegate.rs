@@ -6,6 +6,7 @@ use anyhow::Result;
 use cocoa::base::{BOOL, NO, YES, id, nil};
 use objc2::{MainThreadMarker, msg_send};
 use objc2_app_kit::{NSApplication, NSCursor, NSRequestUserAttentionType};
+#[cfg(feature = "microphone_access")]
 use objc2_av_foundation::{AVAuthorizationStatus, AVCaptureDevice, AVMediaTypeAudio};
 use objc2_foundation::NSUInteger;
 use warpui_core::accessibility::AccessibilityContent;
@@ -438,20 +439,27 @@ impl platform::Delegate for AppDelegate {
     }
 
     fn microphone_access_state(&self) -> MicrophoneAccessState {
-        // SAFETY: this is a global static variable, but simply reading it should be safe.
-        let media_type = unsafe { AVMediaTypeAudio };
-        let Some(media_type) = media_type else {
-            return MicrophoneAccessState::NotDetermined;
-        };
+        #[cfg(feature = "microphone_access")]
+        {
+            // SAFETY: this is a global static variable, but simply reading it should be safe.
+            let media_type = unsafe { AVMediaTypeAudio };
+            let Some(media_type) = media_type else {
+                return MicrophoneAccessState::NotDetermined;
+            };
 
-        // SAFETY: this can raise an exception if you pass an invalid media type, but we're only
-        // ever passing AVMediaTypeAudio here.
-        let status = unsafe { AVCaptureDevice::authorizationStatusForMediaType(media_type) };
-        match status {
-            AVAuthorizationStatus::Restricted => MicrophoneAccessState::Restricted,
-            AVAuthorizationStatus::Denied => MicrophoneAccessState::Denied,
-            AVAuthorizationStatus::Authorized => MicrophoneAccessState::Authorized,
-            _ => MicrophoneAccessState::NotDetermined, // fallback
+            // SAFETY: this can raise an exception if you pass an invalid media type, but we're only
+            // ever passing AVMediaTypeAudio here.
+            let status = unsafe { AVCaptureDevice::authorizationStatusForMediaType(media_type) };
+            match status {
+                AVAuthorizationStatus::Restricted => MicrophoneAccessState::Restricted,
+                AVAuthorizationStatus::Denied => MicrophoneAccessState::Denied,
+                AVAuthorizationStatus::Authorized => MicrophoneAccessState::Authorized,
+                _ => MicrophoneAccessState::NotDetermined, // fallback
+            }
+        }
+        #[cfg(not(feature = "microphone_access"))]
+        {
+            MicrophoneAccessState::NotDetermined
         }
     }
 }
