@@ -114,19 +114,23 @@ impl LocalShellState {
         };
 
         // Execute a command to fetch the user's PATH var, and store it
-        // in the associated field
-        ctx.spawn(
-            async move { execute_command(shell_type, clone, None, command).await },
-            |me, res, _| match me {
-                LocalShellState::Loaded(local_shell_state) => {
-                    // Trim to remove trailing newline from `echo $PATH` output
-                    local_shell_state.path_env_var = res.ok().map(|s| s.trim().to_string());
-                }
-                LocalShellState::NotLoaded => {
-                    log::warn!("Tried to execute a command on LocalShell that wasn't loaded")
-                }
-            },
-        );
+        // in the associated field. Lean skips it: its only reader is the Drive secrets dialog,
+        // which lean hides, and the login shell runs the user's profile at launch, competing
+        // with the first tab's own shell.
+        if !cfg!(feature = "lean") {
+            ctx.spawn(
+                async move { execute_command(shell_type, clone, None, command).await },
+                |me, res, _| match me {
+                    LocalShellState::Loaded(local_shell_state) => {
+                        // Trim to remove trailing newline from `echo $PATH` output
+                        local_shell_state.path_env_var = res.ok().map(|s| s.trim().to_string());
+                    }
+                    LocalShellState::NotLoaded => {
+                        log::warn!("Tried to execute a command on LocalShell that wasn't loaded")
+                    }
+                },
+            );
+        }
 
         Self::Loaded(LocalShell {
             shell_type,

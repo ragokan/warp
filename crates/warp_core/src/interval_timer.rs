@@ -1,3 +1,4 @@
+use std::fmt;
 use std::time::Duration;
 
 use instant::Instant;
@@ -118,6 +119,16 @@ impl TimingDataPoint {
             cumulative_duration_ms,
             name,
         }
+    }
+}
+
+impl fmt::Display for TimingDataPoint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} +{} ms (at {} ms)",
+            self.name, self.marginal_duration_ms, self.cumulative_duration_ms
+        )
     }
 }
 

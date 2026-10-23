@@ -126,7 +126,7 @@ fn format_for_file_output(
     writeln!(
         buf,
         "{} [{}] {}{}",
-        buf.timestamp(),
+        buf.timestamp_millis(),
         record.level(),
         target,
         record.args()

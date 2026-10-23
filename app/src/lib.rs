@@ -2053,10 +2053,24 @@ pub(crate) fn initialize_app(
         // If the app was opened while logged out, record an event for measuring new users.
         // This is sent immediately in case they quit the app on the signup screen.
         send_telemetry_sync_from_app_ctx!(TelemetryEvent::LoggedOutStartup, ctx);
-        download_method::determine_and_report(
-            auth_state.clone(),
-            ctx.background_executor().clone(),
-        );
+        if cfg!(feature = "lean") {
+            // Lean is always signed out and sends no telemetry, so this log line is the only
+            // record of the startup timings the signed-in branch reports. Lean also skips the
+            // download-method report: on macOS it spawns `brew list --cask warp` (Homebrew's
+            // Ruby) at every launch, only to fill in a telemetry field.
+            ctx.on_first_frame_drawn(|ctx| {
+                let timing_data = IntervalTimer::handle(ctx).update(ctx, |timer, _| {
+                    timer.mark_interval_end("FIRST_FRAME_DRAWN");
+                    timer.compute_stats()
+                });
+                log::info!("Startup timing: {}", timing_data.iter().join(", "));
+            });
+        } else {
+            download_method::determine_and_report(
+                auth_state.clone(),
+                ctx.background_executor().clone(),
+            );
+        }
     }
 
     #[cfg(not(target_family = "wasm"))]
@@ -2661,7 +2675,9 @@ pub(crate) fn initialize_app(
 
     // Index global rules (e.g. ~/.agents/AGENTS.md) on a background task so
     // they are available to subsequent agent queries.
-    ProjectContextModel::handle(ctx).update(ctx, |me, ctx| me.index_global_rules(ctx));
+    if !cfg!(feature = "lean") {
+        ProjectContextModel::handle(ctx).update(ctx, |me, ctx| me.index_global_rules(ctx));
+    }
     #[cfg(all(not(target_family = "wasm"), feature = "local_fs"))]
     {
         ctx.add_singleton_model(ai::remote_agent_context::RemoteAgentContext::new);
