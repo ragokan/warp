@@ -9,12 +9,25 @@ mod macos_app_icon {
     pub use objc2_app_kit::{NSApplication, NSImage, NSWorkspace, NSWorkspaceIconCreationOptions};
     pub use objc2_foundation::{NSBundle, NSString, ns_string};
     pub use warp_core::channel::{Channel, ChannelState};
+    pub use warp_core::user_preferences::GetUserPreferences;
 
     pub use crate::settings::app_icon::{AppIcon, AppIconSettings, AppIconSettingsChangedEvent};
 }
 use anyhow::anyhow;
 #[cfg(target_os = "macos")]
 use macos_app_icon::*;
+
+/// Private preference holding `[bundle path, icon file name]` for the custom icon last written
+/// into an app bundle.
+#[cfg(target_os = "macos")]
+const WRITTEN_BUNDLE_ICON_KEY: &str = "WrittenBundleIcon";
+
+/// Whether the bundle directory carries a custom Finder icon: `setIcon:forFile:options:` stores
+/// a folder's icon in an `Icon\r` file inside it.
+#[cfg(target_os = "macos")]
+fn bundle_has_custom_icon(bundle_path: &str) -> bool {
+    std::path::Path::new(bundle_path).join("Icon\r").exists()
+}
 pub use warp_core::ui::appearance::{Appearance, AppearanceEvent};
 
 use crate::ASSETS;
@@ -215,12 +228,15 @@ impl AppearanceManager {
                 // Reset to nil to use the bundle's default icon.
                 // SAFETY: `setApplicationIconImage:` accepts `nil` to restore the bundled icon.
                 unsafe { ns_app.setApplicationIconImage(None) };
-                workspace.setIcon_forFile_options(
-                    None,
-                    &bundle_path,
-                    NSWorkspaceIconCreationOptions::empty(),
-                );
-                workspace.noteFileSystemChanged_(&bundle_path);
+                // Lean skips the reset when the bundle has no custom icon to remove.
+                if !cfg!(feature = "lean") || bundle_has_custom_icon(&bundle_path.to_string()) {
+                    workspace.setIcon_forFile_options(
+                        None,
+                        &bundle_path,
+                        NSWorkspaceIconCreationOptions::empty(),
+                    );
+                    workspace.noteFileSystemChanged_(&bundle_path);
+                }
                 return;
             }
 
@@ -258,12 +274,37 @@ impl AppearanceManager {
             // Override the bundled icon with this new image.
             // SAFETY: `setApplicationIconImage:` accepts a non-nil image.
             unsafe { ns_app.setApplicationIconImage(Some(&image)) };
-            workspace.setIcon_forFile_options(
+
+            // Writing the icon into the bundle re-encodes the image on the main thread (about
+            // 200 ms at every launch, measured on an M4 Mac mini). Lean skips the write when this
+            // bundle still carries the icon it wrote last time; an update replaces the bundle
+            // and with it the icon file.
+            let written_icon = serde_json::to_string(&(bundle_path.to_string(), icon_name))
+                .expect("strings serialize to JSON");
+            if cfg!(feature = "lean")
+                && bundle_has_custom_icon(&bundle_path.to_string())
+                && app
+                    .private_user_preferences()
+                    .read_value(WRITTEN_BUNDLE_ICON_KEY)
+                    .ok()
+                    .flatten()
+                    .as_deref()
+                    == Some(written_icon.as_str())
+            {
+                log::debug!("App bundle already carries icon {icon_name}");
+                return;
+            }
+            let did_write = workspace.setIcon_forFile_options(
                 Some(&image),
                 &bundle_path,
                 NSWorkspaceIconCreationOptions::empty(),
             );
             workspace.noteFileSystemChanged_(&bundle_path);
+            if cfg!(feature = "lean") && did_write {
+                let _ = app
+                    .private_user_preferences()
+                    .write_value(WRITTEN_BUNDLE_ICON_KEY, written_icon);
+            }
 
             // `image` is a `Retained<NSImage>` that releases the `+1` retain from
             // `[NSImage alloc]` when it drops at the end of this scope.
